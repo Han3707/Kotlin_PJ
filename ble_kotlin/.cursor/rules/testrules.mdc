@@ -1,0 +1,100 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+이제 너는 Kotlin 프로 개발자이며, Lantern BLE 테스트 앱을 깔끔하고 유지보수성 높게 구현해야 해. 아래 **기본 룰**을 지키면서, **단계별**로 각 클래스·Composable·ViewModel 코드를 출력해 줘.
+
+---
+
+🔹 **[공통 코딩 룰]**  
+1. Kotlin 스타일 가이드(네이밍, 포맷)를 준수  
+2. SOLID 원칙 적용, 중복 제거(DRY), 적절한 추상화  
+3. KDoc 주석으로 public API 문서화  
+4. 예외 처리·로깅·단위 테스트 포함  
+5. 기능별 모듈화 (BleManager, UI, ViewModel, Utils, Data)  
+
+---
+
+📦 **[프로젝트 구조]**  
+- **BleManager**  
+  - BleServiceManager.kt  
+  - BlePermissionsManager.kt  
+  - BleAdvertiser.kt  
+  - BleScanner.kt  
+  - BleGattClient.kt  
+  - BleGattServer.kt  
+- **Utils**  
+  - Constants.kt (UUID, 권한 코드)  
+  - DataClasses.kt (ScannedDevice, ChatMessage)  
+  - DistanceEstimator.kt (RSSI→거리 계산)  
+- **UI** (`jetpack-compose`)  
+  - BleStatusSection.kt  
+  - DeviceListSection.kt  
+  - GattChatSection.kt  
+  - AppColors.kt  
+- **ViewModel**  
+  - BleViewModel.kt  
+
+---
+
+🛠 **[UI/UX & 색상]**  
+- 배경: `#FFFFFF` 또는 `#F2F2F2`  
+- 텍스트/아이콘: `#333333`  
+- 액션 버튼: 배경 `#FFC300` / 아이콘 `#333333`  
+- 상태 표시:  
+  - 활성: `#4CAF50`,  
+  - 실패: `#F44336`,  
+  - 대기: `#FFC107`,  
+  - 비활성: `#AAAAAA`  
+
+---
+
+🚀 **[단계별 구현 & 요청 방식]**  
+각 단계마다 “**파일명**” 혹은 “**클래스명**”과 함께,  
+- 필요한 **함수 시그니처**  
+- **Compose UI** 레이아웃 구조(파라미터 포함)  
+- **ViewModel** 프로퍼티 & 상태흐름  
+- **코틀린 DSL(Gradle)** 의존성 예시  
+를 명확히 명시해서 코드 스니펫을 달라고 요청해 줘.
+
+### 1️⃣ 단계 1: BLE 권한 및 어댑터 초기화  
+> “BleServiceManager.kt”  
+- `initAdapter(): Boolean`  
+- `enableBluetooth(): Flow<Boolean>`  
+- `checkPermissions(): Flow<PermissionState>`  
+- 짧은 예제 코드와 함께 KDoc 달 것.  
+
+### 2️⃣ 단계 2: 광고(Advertiser) & 스캔(Scanner) 모듈  
+> “BleAdvertiser.kt”, “BleScanner.kt”  
+- `startAdvertising(uuid: UUID): Result<Unit>`  
+- `stopAdvertising(): Result<Unit>`  
+- `startScan(uuid: UUID): Flow<ScannedDevice>`  
+- `stopScan(): Result<Unit>`  
+- 코루틴 + 채널 사용 예시 포함  
+
+### 3️⃣ 단계 3: GATT 클라이언트/서버  
+> “BleGattClient.kt”, “BleGattServer.kt”  
+- `connectToDevice(device: ScannedDevice): Flow<GattState>`  
+- `sendMessage(message: String): Result<Unit>`  
+- `receiveMessages(): Flow<ChatMessage>`  
+- 서비스/캐릭터리스틱 탐색 및 예외처리 코드  
+
+### 4️⃣ 단계 4: UI Composables & ViewModel  
+> “BleStatusSection.kt”, “DeviceListSection.kt”, “GattChatSection.kt”  
+- Compose 함수 시그니처(예: `@Composable fun BleStatusSection(state: BleState, onToggleScan: ()->Unit)`)  
+- `BleViewModel` 에서 상태 관리 및 이벤트 메소드 정의  
+- 샘플 Preview 코드  
+
+### 5️⃣ 단계 5: 테스트 & 예외 처리  
+- 각 모듈별 **JUnit + MockK** 테스트 스텁  
+- `BleServiceManager` 권한 흐름 테스트 예시  
+- Compose UI snapshot 테스트 방법 제안  
+
+---
+
+🔎 **추가 질문**  
+- UUID 예시나 Android API 레벨 최소 지원 정보를 알려주시면 더욱 정확한 코드를 만들 수 있어요.  
+- BLE 통신 시 보안(암호화) 모듈이 필요한지도 검토가 필요합니다.
+
+이 프롬프트를 바탕으로, **파일별·단계별**로 완성도 높은 Kotlin BLE 테스트 앱 코드를 순차적으로 생성해 주세요. 감사합니다!

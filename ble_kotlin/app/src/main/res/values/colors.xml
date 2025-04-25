@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors -->
+    <color name="purple_200">#BB86FC</color>
+    <color name="purple_500">#6200EE</color>
+    <color name="purple_700">#3700B3</color>
+
+    <!-- Secondary colors -->
+    <color name="teal_200">#03DAC5</color>
+    <color name="teal_700">#018786</color>
+
+    <!-- Neutral colors -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="light_gray">#CCCCCC</color>
+    <color name="dark_gray">#333333</color>
+
+    <!-- Background colors -->
+    <color name="dark_background">#121212</color>
+
+    <!-- Custom app colors -->
+    <color name="ble_connected">#4CAF50</color>    <!-- Green for connected state -->
+    <color name="ble_disconnected">#F44336</color>    <!-- Red for disconnected state -->
+    <color name="ble_scanning">#2196F3</color>    <!-- Blue for scanning state -->
+</resources> 

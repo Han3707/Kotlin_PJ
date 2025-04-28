@@ -1,0 +1,64 @@
+[versions]
+# Build Tools & Foundational
+agp = "8.4.0"
+kotlin = "1.9.22"
+ksp = "1.9.22-1.0.17"
+coreKtx = "1.13.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+activity = "1.9.0"
+# Lifecycle & Coroutines
+lifecycle = "2.7.0"
+kotlinxCoroutines = "1.8.1"
+# Dependency Injection (Hilt)
+hilt = "2.50"
+# UI Layout
+constraintlayout = "2.2.0"
+# BLE (Nordic Android BLE Library)
+nordicBle = "2.6.1"
+# Testing
+junit4 = "4.13.2"
+androidxJunit = "1.2.0"
+androidxEspresso = "3.6.0"
+
+[libraries]
+
+# AndroidX Core & UI
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+# Corrected group ID for Material library
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" } # Keep if using ConstraintLayout Views
+
+# Lifecycle & Coroutines
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+# Uncommented as it's used in app/build.gradle
+androidx-lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycle" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" } # Add core if needed
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+
+# Hilt (DI)
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" } # Used with KSP
+
+# BLE (Nordic Android BLE Library - v2/v4 line)
+nordic-ble = { group = "no.nordicsemi.android", name = "ble", version.ref = "nordicBle" } # Main library (includes ble-common)
+nordic-ble-ktx = { group = "no.nordicsemi.android", name = "ble-ktx", version.ref = "nordicBle" } # Kotlin extensions
+# nordic-ble-common is NOT defined here as it's likely included in nordic-ble
+
+# Testing (Corrected keys to match usage in app/build.gradle)
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" } # Key is 'junit4'
+androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" } # Key is 'androidx-test-junit'
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspresso" } # Key is 'androidx-espresso-core'
+
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+# Use version.ref for KSP plugin consistency
+kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+# kotlin-kapt plugin definition removed

@@ -48,10 +48,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.bletest.data.model.ConnectionState
+import com.example.bletest.data.model.ScanResultData
 import com.example.bletest.ui.view.components.ConnectionStatusView
 import com.example.bletest.ui.view.components.LogView
 import com.example.bletest.ui.viewmodel.BleViewModel
 import com.example.bletest.utils.PermissionHelper
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
 
 /**
  * 메인 화면
@@ -105,6 +110,12 @@ fun MainScreen(
             connectionState.state == ConnectionState.CONNECTED
         }
     }
+    
+    // 스캔 결과 관찰
+    val scanResults by viewModel.scanResults.collectAsStateWithLifecycle()
+    
+    // 스캔 상태 관찰
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     
     // 디바이스 ID 입력
     var deviceIdInput by remember { mutableStateOf("") }
@@ -237,7 +248,66 @@ fun MainScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
             
-            // 발견된 디바이스 목록
+            // 발견된 디바이스 목록 카드 (스캔 결과 표시 및 연결 버튼 추가)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "주변 기기 목록",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        // 스캔 버튼 (isScanning 상태에 따라 텍스트 변경)
+                        Button(onClick = {
+                            if (isScanning) {
+                                viewModel.stopScanning()
+                            } else {
+                                viewModel.startScanning() // 스캔 시작 함수 호출
+                            }
+                        }) {
+                            Text(if (isScanning) "스캔 중지" else "스캔 시작")
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 스캔 결과 목록 (LazyColumn 사용)
+                    if (scanResults.isEmpty() && !isScanning) {
+                        Text("주변에 검색된 기기가 없습니다.", style = MaterialTheme.typography.bodyMedium)
+                    } else if (isScanning && scanResults.isEmpty()) {
+                         Text("기기 검색 중...", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp) // 목록 최대 높이 제한
+                        ) {
+                            items(scanResults, key = { it.address }) { result ->
+                                DiscoveredDeviceItem(scanResult = result) {
+                                    // 항목 클릭 시 연결 시도
+                                    Log.d("MainScreen", "기기 연결 시도: ${result.name} (${result.address})")
+                                    viewModel.connectDevice(result.device)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 디바이스 ID 설정 카드
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -325,6 +395,29 @@ fun MainScreen(
             // 여백
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+/**
+ * 발견된 디바이스 항목을 표시하는 Composable
+ */
+@Composable
+private fun DiscoveredDeviceItem(
+    scanResult: ScanResultData,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick) // 클릭 가능하게 설정
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = scanResult.name ?: "알 수 없는 장치", style = MaterialTheme.typography.bodyLarge)
+            Text(text = scanResult.address, style = MaterialTheme.typography.bodySmall)
+        }
+        Text(text = "RSSI: ${scanResult.rssi}", style = MaterialTheme.typography.bodyMedium)
     }
 }
 

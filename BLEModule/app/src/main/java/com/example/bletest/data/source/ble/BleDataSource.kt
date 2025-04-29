@@ -205,6 +205,13 @@ interface BleDataSource {
      * GATT 클라이언트 이벤트 Flow
      */
     val clientEvents: Flow<GattClientEvent>
+
+    /**
+     * 디바이스 ID 설정
+     * 
+     * @param id 설정할 디바이스 ID
+     */
+    fun setDeviceId(id: String)
 }
 
 /**
@@ -219,8 +226,18 @@ sealed class AdvertiseEvent {
  * GATT 서버 이벤트를 나타내는 sealed class
  */
 sealed class GattServerEvent {
-    data class DeviceConnected(val device: BluetoothDevice) : GattServerEvent()
-    data class DeviceDisconnected(val device: BluetoothDevice) : GattServerEvent()
+    data class DeviceConnected(val device: BluetoothDevice?) : GattServerEvent()
+    data class DeviceDisconnected(val device: BluetoothDevice?) : GattServerEvent()
+    data class CharacteristicRead(val device: BluetoothDevice, val characteristic: BluetoothGattCharacteristic) : GattServerEvent()
+    data class CharacteristicWrite(val device: BluetoothDevice, val characteristic: BluetoothGattCharacteristic, val value: ByteArray) : GattServerEvent()
+    data class DescriptorWrite(val device: BluetoothDevice, val descriptor: BluetoothGattDescriptor, val value: ByteArray) : GattServerEvent()
+    data class NotificationsEnabled(val device: BluetoothDevice, val characteristic: BluetoothGattCharacteristic) : GattServerEvent()
+    data class NotificationsDisabled(val device: BluetoothDevice, val characteristic: BluetoothGattCharacteristic) : GattServerEvent()
+    data class ServiceAdded(val service: BluetoothGattService?) : GattServerEvent()
+    data class ServiceAddFailed(val status: Int) : GattServerEvent()
+    data object ServerStarted : GattServerEvent()
+    data class ServerStartFailed(val reason: String) : GattServerEvent()
+    data object ServerStopped : GattServerEvent()
     data class CharacteristicReadRequest(
         val device: BluetoothDevice,
         val requestId: Int,
@@ -261,6 +278,7 @@ sealed class GattServerEvent {
  * GATT 클라이언트 이벤트를 나타내는 sealed class
  */
 sealed class GattClientEvent {
+    data class PermissionDenied(val permission: String) : GattClientEvent()
     data class ConnectionStateChange(
         val address: String,
         val status: Int,

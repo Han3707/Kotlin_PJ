@@ -2,7 +2,11 @@ package com.example.bletest.data.model
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.content.Context
+import android.os.Build
 import android.os.Parcelable
+import android.util.Log
+import com.example.bletest.utils.PermissionHelper.withBleConnectPermission
 import kotlinx.parcelize.Parcelize
 
 /**
@@ -13,8 +17,8 @@ import kotlinx.parcelize.Parcelize
 data class DeviceConnectionState(
     // 기본 디바이스 식별 정보
     val device: BluetoothDevice? = null,
-    val address: String = device?.address ?: "",
-    val name: String? = device?.name,
+    val address: String = "",  // 생성자에서 명시적으로 설정
+    val name: String? = null,  // 생성자에서 명시적으로 설정
     
     // 메시 네트워크 식별 정보
     val nodeId: String = "",
@@ -31,6 +35,44 @@ data class DeviceConnectionState(
     // 메타데이터
     val lastUpdatedTimeMillis: Long = System.currentTimeMillis()
 ) : Parcelable {
+
+    constructor(
+        device: BluetoothDevice?,
+        state: ConnectionState = ConnectionState.DISCONNECTED,
+        errorMessage: String? = null,
+        nodeId: String = "",
+        deviceId: String = "",
+        hopCount: Int = 0,
+        rssi: Int = 0
+    ) : this(
+        device = device,
+        address = if (device == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            device?.address ?: ""
+        } else {
+            try {
+                device.address
+            } catch (e: SecurityException) {
+                Log.e("DeviceConnectionState", "권한 없음: ${e.message}")
+                ""
+            }
+        },
+        name = if (device == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            device?.name
+        } else {
+            try {
+                device.name
+            } catch (e: SecurityException) {
+                Log.e("DeviceConnectionState", "권한 없음: ${e.message}")
+                null
+            }
+        },
+        state = state,
+        errorMessage = errorMessage,
+        nodeId = nodeId,
+        deviceId = deviceId,
+        hopCount = hopCount,
+        rssi = rssi
+    )
 
     /**
      * 현재 상태가 연결됨인지 확인
@@ -50,7 +92,6 @@ data class DeviceConnectionState(
         /**
          * ScanResultData에서 DeviceConnectionState 생성
          */
-        @SuppressLint("MissingPermission")
         fun fromScanResult(scanResult: ScanResultData): DeviceConnectionState {
             return DeviceConnectionState(
                 device = scanResult.device,
@@ -59,6 +100,25 @@ data class DeviceConnectionState(
                 deviceId = scanResult.deviceId,
                 rssi = scanResult.rssi,
                 lastUpdatedTimeMillis = scanResult.timestamp
+            )
+        }
+        
+        /**
+         * Context를 통해 안전하게 DeviceConnectionState 생성
+         */
+        fun safeCreate(context: Context, device: BluetoothDevice?): DeviceConnectionState {
+            val address = if (device == null) "" else {
+                context.withBleConnectPermission { device.address } ?: ""
+            }
+            
+            val name = if (device == null) null else {
+                context.withBleConnectPermission { device.name }
+            }
+            
+            return DeviceConnectionState(
+                device = device,
+                address = address,
+                name = name
             )
         }
     }

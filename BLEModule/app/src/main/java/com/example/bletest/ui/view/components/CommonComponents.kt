@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.bletest.data.model.DeviceConnectionState
 import com.example.bletest.data.model.MessageData
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -103,7 +104,7 @@ fun MessageInput(
                 enabled = message.isNotBlank() && targetId.isNotBlank()
             ) {
                 Icon(
-                    imageVector = Icons.Default.Send,
+                    imageVector = Icons.AutoMirrored.Filled.Send,
                     contentDescription = "전송"
                 )
             }
@@ -177,8 +178,9 @@ fun MessageBubble(
  */
 @Composable
 fun ConnectionStatusView(
-    isConnected: Boolean,
-    deviceName: String?,
+    connectionState: DeviceConnectionState,
+    isConnected: Boolean = connectionState.isConnected(),
+    deviceName: String? = connectionState.name ?: connectionState.address.takeIf { it.isNotEmpty() },
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = if (isConnected) Color(0xFF4CAF50) else Color(0xFFE53935)
@@ -207,6 +209,15 @@ fun ConnectionStatusView(
             )
             
             deviceName?.let {
+                Text(
+                    text = it,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            
+            // 오류 메시지가 있는 경우 표시
+            connectionState.errorMessage?.let {
                 Text(
                     text = it,
                     color = Color.White,

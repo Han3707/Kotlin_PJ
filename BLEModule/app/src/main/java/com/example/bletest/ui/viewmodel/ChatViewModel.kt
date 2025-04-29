@@ -1,5 +1,6 @@
 package com.example.bletest.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bletest.data.model.MessageData
@@ -85,19 +86,51 @@ class ChatViewModel @Inject constructor(
             }
             return
         }
+        
+        // 자기 자신에게 메시지를 보내려는 경우 방지
+        if (target == myDeviceId) {
+            viewModelScope.launch {
+                _uiEvent.emit(ChatUiEvent.ShowToast("자신에게는 메시지를 보낼 수 없습니다"))
+            }
+            return
+        }
+
+        // 전송 전 로그
+        Log.d("ChatViewModel", "메시지 전송 시도: target=$target, content=$text, myId=${myDeviceId}")
 
         viewModelScope.launch {
             try {
+                // 전송 시도
+                Log.d("ChatViewModel", "BleRepository.sendMessage() 호출")
                 val success = bleRepository.sendMessage(target, MessageType.TEXT, text)
+                
+                Log.d("ChatViewModel", "메시지 전송 결과: $success")
                 
                 if (success) {
                     _messageText.value = "" // 메시지 전송 성공 시 입력창 초기화
+                    
+                    // 성공적으로 보낸 메시지를 로컬 메시지 목록에 추가
+                    val newMessage = MessageData(
+                        sourceId = myDeviceId,
+                        targetId = target,
+                        content = text,
+                        messageType = MessageType.TEXT,
+                        isOutgoing = true,
+                        isSent = true,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    
+                    // 현재 메시지 목록에 직접 추가
+                    _messages.update { currentList -> currentList + newMessage }
+                    
                     _uiEvent.emit(ChatUiEvent.ShowToast("메시지 전송 성공"))
                 } else {
-                    _uiEvent.emit(ChatUiEvent.ShowToast("메시지 전송 실패"))
+                    Log.e("ChatViewModel", "메시지 전송 실패: target=$target")
+                    _uiEvent.emit(ChatUiEvent.ShowToast("메시지 전송 실패 - 상대방과 연결이 원활하지 않습니다"))
                 }
             } catch (e: Exception) {
-                _uiEvent.emit(ChatUiEvent.ShowToast("오류: ${e.message}"))
+                Log.e("ChatViewModel", "메시지 전송 오류", e)
+                _uiEvent.emit(ChatUiEvent.ShowToast("오류: ${e.message ?: "알 수 없는 오류"}"))
             }
         }
     }

@@ -5,6 +5,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.bletest.ui.view.chat.ChatScreen
+import com.example.bletest.ui.view.chat.PublicChatScreen
 import com.example.bletest.ui.view.main.MainScreen
 
 /**
@@ -13,6 +14,7 @@ import com.example.bletest.ui.view.main.MainScreen
 object NavRoute {
     const val MAIN = "main"
     const val CHAT = "chat"
+    const val PUBLIC_CHAT = "public_chat"
 }
 
 /**
@@ -31,6 +33,9 @@ fun BleMeshNavigation() {
             MainScreen(
                 onNavigateToChat = {
                     navController.navigate(NavRoute.CHAT)
+                },
+                onNavigateToPublicChat = {
+                    navController.navigate(NavRoute.PUBLIC_CHAT)
                 }
             )
         }
@@ -38,6 +43,15 @@ fun BleMeshNavigation() {
         // 채팅 화면
         composable(NavRoute.CHAT) {
             ChatScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        // 공통 채팅 화면
+        composable(NavRoute.PUBLIC_CHAT) {
+            PublicChatScreen(
                 onNavigateBack = {
                     navController.popBackStack()
                 }

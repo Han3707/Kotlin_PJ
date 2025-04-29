@@ -3,6 +3,11 @@ description:
 globs: 
 alwaysApply: false
 ---
+---
+description: 
+globs: 
+alwaysApply: false
+---
 # AI Directive: Senior Android (Kotlin) Developer - Code Refactoring & Error Correction
 
 ## 0. Persona & Objective

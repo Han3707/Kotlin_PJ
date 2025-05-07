@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Lantern</string>
+
+    <!-- 다른 문자열 리소스들 -->
+    <string name="bottom_nav_friendlist">통화목록</string>
+    <string name="bottom_nav_home">홈</string>
+    <string name="bottom_nav_mypage">마이페이지</string>
+
+    <!-- Google Sign In Web Client ID -->
+    <string name="your_web_client_id" translatable="false">391964374164-gmg1efk6513ksttoak3k5h873go3edpq.apps.googleusercontent.com</string>
+
+    <!-- Google 로그인 오류 메시지 -->
+    <string name="google_signin_cancelled">로그인이 취소되었습니다.</string>
+    <string name="google_signin_error">Google 로그인 중 오류가 발생했습니다.</string>
+    <string name="google_signin_network_error">네트워크 오류가 발생했습니다. 인터넷 연결을 확인하세요.</string>
+    <string name="google_signin_developer_error">앱이 Google에 올바르게 등록되지 않았습니다. SHA-1 키를 Firebase 콘솔에 등록해주세요.</string>
+</resources>

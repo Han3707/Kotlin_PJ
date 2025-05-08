@@ -2,9 +2,13 @@ package com.ssafy.lantern.ui.screens.chat
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,37 +16,44 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.* // Material Components 임포트
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.google.accompanist.permissions.* // Accompanist Permissions 임포트
+import androidx.navigation.NavController
+import com.google.accompanist.permissions.*
 import com.ssafy.lantern.data.model.ChatMessage as MeshChatMessage
 import com.ssafy.lantern.ui.theme.LanternTheme
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
-@OptIn(ExperimentalPermissionsApi::class) // Accompanist Permissions 사용
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ChatScreen(
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    navController: NavController? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -64,6 +75,11 @@ fun ChatScreen(
     var showNameDialog by remember { mutableStateOf(false) }
     var nameInput by remember { mutableStateOf("") }
 
+    // 시스템 패딩 계산
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navigationBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val imeHeight = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+
     // --- 권한 처리 --- //
     val requiredPermissions = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -71,7 +87,7 @@ fun ChatScreen(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.ACCESS_FINE_LOCATION // 스캔에 필요
+                Manifest.permission.ACCESS_FINE_LOCATION
             )
         } else {
             listOf(
@@ -181,116 +197,146 @@ fun ChatScreen(
     // --- UI --- //
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("랜턴 채팅") })
-        }
+            TopAppBar(
+                title = { Text("랜턴 채팅") },
+                navigationIcon = navController?.let {
+                    {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "뒤로 가기")
+                        }
+                    }
+                },
+                modifier = Modifier.padding(top = statusBarHeight)
+            )
+        },
+        modifier = Modifier.fillMaxSize()
     ) { paddingValues ->
-        Column(
+        // 메인 컨텐츠 영역
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp)
         ) {
-            // 채팅 모드 선택 탭
-            TabRow(selectedTabIndex = tabIndex) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        text = { Text(title) },
-                        selected = tabIndex == index,
-                        onClick = { tabIndex = index }
-                    )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = navigationBarHeight) // 하단 내비게이션 바 패딩 추가
+            ) {
+                // 채팅 모드 선택 탭
+                TabRow(selectedTabIndex = tabIndex) {
+                    tabs.forEachIndexed { index, title ->
+                        Tab(
+                            text = { Text(title, maxLines = 1) },
+                            selected = tabIndex == index,
+                            onClick = { tabIndex = index }
+                        )
+                    }
                 }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // 권한 및 블루투스 상태
-            PermissionAndBluetoothStatus(permissionState, uiState.isBluetoothEnabled) {
-                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-                enableBluetoothLauncher.launch(enableBtIntent)
-            }
-            
-            // 모드에 따라 다른 UI 표시
-            when (uiState.chatMode) {
-                ChatMode.CLASSIC_BLE -> {
-                    // 기존 BLE 채팅 UI
-                    ClassicBleChat(
-                        uiState = uiState,
-                        scannedDevicesListState = scannedDevicesListState,
-                        messagesListState = messagesListState,
-                        textState = textState,
-                        onTextChange = { textState = it },
-                        onConnectToDevice = { viewModel.connectToDevice(it) },
-                        onSendMessage = {
-                            viewModel.sendMessage(textState)
-                            textState = ""
-                        }
-                    )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // 권한 및 블루투스 상태
+                PermissionAndBluetoothStatus(permissionState, uiState.isBluetoothEnabled) {
+                    val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    enableBluetoothLauncher.launch(enableBtIntent)
                 }
-                ChatMode.MESH_BLE -> {
-                    // Nordic BLE Mesh 채팅 UI
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(vertical = 8.dp)
-                    ) {
-                        // 네트워크 연결 상태
-                        if (!uiState.isMeshNetworkConnected) {
-                            ConnectionStatusBar(connected = false)
-                        }
-                        
-                        // Mesh 채팅 탭 (공용/개인)
-                        TabRow(selectedTabIndex = meshTabIndex) {
-                            meshTabs.forEachIndexed { index, title ->
-                                Tab(
-                                    text = { Text(title) },
-                                    selected = meshTabIndex == index,
-                                    onClick = { 
-                                        meshTabIndex = index
-                                        if (index == 0) {
-                                            viewModel.selectPublicChat()
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        
-                        // 채팅 내용
-                        when (meshTabIndex) {
-                            0 -> MeshPublicChatContent(
-                                messages = uiState.meshPublicMessages,
-                                localAddress = uiState.meshLocalAddress,
-                                modifier = Modifier.weight(1f)
-                            )
-                            1 -> MeshPrivateChatContent(
-                                messages = uiState.meshPrivateMessages,
-                                currentPartner = uiState.meshCurrentChatPartner,
-                                localAddress = uiState.meshLocalAddress,
-                                onSelectPartner = { viewModel.selectChatPartner(it) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        
-                        // 메시지 입력
-                        MessageInput(
-                            text = textState,
+                
+                // 모드에 따라 다른 UI 표시
+                when (uiState.chatMode) {
+                    ChatMode.CLASSIC_BLE -> {
+                        // 기존 BLE 채팅 UI
+                        ClassicBleChat(
+                            uiState = uiState,
+                            scannedDevicesListState = scannedDevicesListState,
+                            messagesListState = messagesListState,
+                            textState = textState,
                             onTextChange = { textState = it },
-                            onSendClick = {
+                            onConnectToDevice = { viewModel.connectToDevice(it) },
+                            onSendMessage = {
                                 if (textState.isNotBlank()) {
                                     viewModel.sendMessage(textState)
                                     textState = ""
                                 }
                             },
-                            enabled = (meshTabIndex == 0) || (uiState.meshCurrentChatPartner != null)
+                            imeHeight = imeHeight
                         )
                     }
+                    ChatMode.MESH_BLE -> {
+                        // Nordic BLE Mesh 채팅 UI
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                // 네트워크 연결 상태
+                                if (!uiState.isMeshNetworkConnected) {
+                                    ConnectionStatusBar(connected = false)
+                                }
+                                
+                                // Mesh 채팅 탭 (공용/개인)
+                                TabRow(selectedTabIndex = meshTabIndex) {
+                                    meshTabs.forEachIndexed { index, title ->
+                                        Tab(
+                                            text = { Text(title) },
+                                            selected = meshTabIndex == index,
+                                            onClick = { 
+                                                meshTabIndex = index
+                                                if (index == 0) {
+                                                    viewModel.selectPublicChat()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                                
+                                // 탭에 따른 채팅 내용 표시
+                                Box(modifier = Modifier.weight(1f)) {
+                                    when (meshTabIndex) {
+                                        0 -> MeshPublicChatContent(
+                                            messages = uiState.meshPublicMessages,
+                                            localAddress = uiState.meshLocalAddress,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        1 -> MeshPrivateChatContent(
+                                            messages = uiState.meshPrivateMessages,
+                                            currentPartner = uiState.meshCurrentChatPartner,
+                                            localAddress = uiState.meshLocalAddress,
+                                            onSelectPartner = { viewModel.selectChatPartner(it) },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                }
+                                
+                                // 메시지 입력
+                                MessageInput(
+                                    text = textState,
+                                    onTextChange = { textState = it },
+                                    onSendClick = {
+                                        if (textState.isNotBlank()) {
+                                            viewModel.sendMessage(textState)
+                                            textState = ""
+                                        }
+                                    },
+                                    enabled = (meshTabIndex == 0) || (uiState.meshCurrentChatPartner != null),
+                                    imeHeight = imeHeight
+                                )
+                            }
+                        }
+                    }
                 }
-            }
 
-            // 에러 메시지 표시
-            uiState.errorMessage?.let {
-                LaunchedEffect(it) {
-                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                    // 에러 메시지 표시 후 ViewModel에서 초기화 필요
+                // 에러 메시지 표시
+                uiState.errorMessage?.let {
+                    DisposableEffect(it) {
+                        Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                        // 에러 메시지 표시 후 초기화
+                        viewModel.clearErrorMessage()
+                        onDispose { }
+                    }
                 }
             }
         }
@@ -306,31 +352,163 @@ private fun ClassicBleChat(
     textState: String,
     onTextChange: (String) -> Unit,
     onConnectToDevice: (String) -> Unit,
-    onSendMessage: () -> Unit
+    onSendMessage: () -> Unit,
+    imeHeight: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     Column {
         Spacer(modifier = Modifier.height(8.dp))
 
         // 스캔된 기기 목록 및 연결 버튼
-        Text("스캔된 기기:", fontWeight = FontWeight.Bold)
-        LazyColumn(
-            modifier = Modifier
-                .height(100.dp)
-                .fillMaxWidth(), 
-            state = scannedDevicesListState
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-             items(uiState.scannedDevices.toList()) { (address, name) ->
-                 Row(
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .clickable { onConnectToDevice(address) }
-                         .padding(vertical = 4.dp),
-                     horizontalArrangement = Arrangement.SpaceBetween
-                 ) {
-                     Text("$name ($address)")
-                 }
-                 Divider()
-             }
+            Text(
+                "검색된 기기: ${uiState.scannedDevices.size}개", 
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            
+            // 스캔 상태 표시
+            if (uiState.isScanning) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("스캔 중...", style = MaterialTheme.typography.caption)
+                }
+            }
+        }
+        
+        if (uiState.scannedDevices.isEmpty()) {
+            // 검색된 기기가 없을 때
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .padding(vertical = 8.dp),
+                elevation = 2.dp,
+                backgroundColor = MaterialTheme.colors.surface
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "검색된 기기가 없습니다.\n블루투스 기기를 켜고 근처에 두세요.",
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray
+                    )
+                }
+            }
+        } else {
+            // 검색된 기기 목록
+            LazyColumn(
+                modifier = Modifier
+                    .height(120.dp)
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp), 
+                state = scannedDevicesListState
+            ) {
+                items(uiState.scannedDevices.toList()) { (address, name) ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable { onConnectToDevice(address) },
+                        elevation = 2.dp,
+                        backgroundColor = if (uiState.connectedDevice?.address == address) 
+                            MaterialTheme.colors.primary.copy(alpha = 0.1f)
+                        else 
+                            MaterialTheme.colors.surface
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = name,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.subtitle1
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = address,
+                                    style = MaterialTheme.typography.caption,
+                                    color = Color.Gray
+                                )
+                                
+                                // 제조사 표시 (이름에 포함되어 있으면 추출)
+                                val manufacturer = name.substringAfter('[').substringBefore(']', "")
+                                if (manufacturer.isNotBlank()) {
+                                    Text(
+                                        text = "제조사: $manufacturer",
+                                        style = MaterialTheme.typography.caption,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF2196F3) // 파란색
+                                    )
+                                }
+                                
+                                // RSSI 표시 추가
+                                val deviceRssi = uiState.deviceRssiMap[address] ?: 0
+                                
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "신호 강도: ",
+                                        style = MaterialTheme.typography.caption
+                                    )
+                                    // RSSI 값에 따른 신호 강도 표시
+                                    val signalColor = when {
+                                        deviceRssi > -60 -> Color(0xFF4CAF50) // 강함 (녹색)
+                                        deviceRssi > -80 -> Color(0xFFFFC107) // 중간 (노란색)
+                                        else -> Color(0xFFF44336) // 약함 (빨간색)
+                                    }
+                                    val signalText = when {
+                                        deviceRssi > -60 -> "강함"
+                                        deviceRssi > -80 -> "중간"
+                                        else -> "약함"
+                                    }
+                                    Text(
+                                        text = "$signalText ($deviceRssi dBm)",
+                                        style = MaterialTheme.typography.caption,
+                                        color = signalColor
+                                    )
+                                }
+                            }
+                            
+                            Button(
+                                onClick = { onConnectToDevice(address) },
+                                colors = ButtonDefaults.buttonColors(
+                                    backgroundColor = if (uiState.connectedDevice?.address == address)
+                                        MaterialTheme.colors.primary.copy(alpha = 0.5f)
+                                    else {
+                                        // RSSI에 따라 버튼 색상 조정 (신호가 약하면 시각적 힌트 제공)
+                                        val rssi = uiState.deviceRssiMap[address] ?: 0
+                                        when {
+                                            rssi > -80 -> MaterialTheme.colors.primary
+                                            rssi > -90 -> Color(0xFFFF9800) // 주황색 (약한 신호)
+                                            else -> Color(0xFFFF5722) // 진한 주황색 (매우 약한 신호)
+                                        }
+                                    }
+                                ),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Text(
+                                    if (uiState.connectedDevice?.address == address) "연결됨" else "연결", 
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -349,8 +527,25 @@ private fun ClassicBleChat(
             state = messagesListState,
             reverseLayout = true
         ) {
-            items(uiState.messages.reversed()) { message ->
-                ChatMessageItem(message)
+            if (uiState.messages.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "메시지가 없습니다.\n연결된 기기와 대화를 시작하세요!",
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            } else {
+                items(uiState.messages.reversed()) { message ->
+                    ChatMessageItem(message)
+                }
             }
         }
 
@@ -361,7 +556,8 @@ private fun ClassicBleChat(
             text = textState,
             onTextChange = onTextChange,
             onSendClick = onSendMessage,
-            enabled = uiState.connectionState == BluetoothProfile.STATE_CONNECTED
+            enabled = uiState.connectionState == BluetoothProfile.STATE_CONNECTED,
+            imeHeight = imeHeight
         )
     }
 }
@@ -379,15 +575,18 @@ private fun PermissionAndBluetoothStatus(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 elevation = 4.dp,
                 backgroundColor = MaterialTheme.colors.error.copy(alpha = 0.1f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Text("BLE 사용 권한이 필요합니다", fontWeight = FontWeight.Bold, color = MaterialTheme.colors.error)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { permissionState.launchMultiplePermissionRequest() }) {
-                        Text("권한 요청")
+                    Button(
+                        onClick = { permissionState.launchMultiplePermissionRequest() },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.error)
+                    ) {
+                        Text("권한 요청", color = Color.White)
                     }
                 }
             }
@@ -397,12 +596,12 @@ private fun PermissionAndBluetoothStatus(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 elevation = 4.dp,
-                backgroundColor = MaterialTheme.colors.error.copy(alpha = 0.1f)
+                backgroundColor = MaterialTheme.colors.primary.copy(alpha = 0.1f)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("블루투스가 비활성화되어 있습니다", fontWeight = FontWeight.Bold, color = MaterialTheme.colors.error)
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("블루투스가 비활성화되어 있습니다", fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary)
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = onRequestBluetoothEnable) {
                         Text("블루투스 활성화")
@@ -425,32 +624,63 @@ private fun ConnectionStatus(uiState: ChatUiState) {
             else -> Color(0xFFFFEBEE) // Light Red
         }
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = when (uiState.connectionState) {
-                    BluetoothProfile.STATE_CONNECTED -> "연결됨: ${uiState.connectedDevice?.name ?: "알 수 없는 기기"}"
-                    BluetoothProfile.STATE_CONNECTING -> "연결 중..."
-                    BluetoothProfile.STATE_DISCONNECTING -> "연결 해제 중..."
-                    else -> "연결 안됨"
-                },
-                color = when (uiState.connectionState) {
-                    BluetoothProfile.STATE_CONNECTED -> Color(0xFF388E3C) // Dark Green
-                    BluetoothProfile.STATE_CONNECTING -> Color(0xFFFBC02D) // Dark Yellow
-                    else -> Color(0xFFD32F2F) // Dark Red
-                },
-                fontWeight = FontWeight.Bold
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            if (uiState.isConnecting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = when (uiState.connectionState) {
+                            BluetoothProfile.STATE_CONNECTED -> "연결됨"
+                            BluetoothProfile.STATE_CONNECTING -> "연결 중..."
+                            BluetoothProfile.STATE_DISCONNECTING -> "연결 해제 중..."
+                            else -> "연결 안됨"
+                        },
+                        color = when (uiState.connectionState) {
+                            BluetoothProfile.STATE_CONNECTED -> Color(0xFF388E3C) // Dark Green
+                            BluetoothProfile.STATE_CONNECTING -> Color(0xFFFBC02D) // Dark Yellow
+                            else -> Color(0xFFD32F2F) // Dark Red
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // 연결된 기기 정보 표시
+                    if (uiState.connectionState == BluetoothProfile.STATE_CONNECTED && uiState.connectedDevice != null) {
+                        val device = uiState.connectedDevice
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "기기 이름: ${device.name ?: "이름 없음"}",
+                            style = MaterialTheme.typography.body2
+                        )
+                        Text(
+                            text = "MAC 주소: ${device.address}",
+                            style = MaterialTheme.typography.body2
+                        )
+                        
+                        // BluetoothDevice 타입 상수 직접 비교
+                        val deviceTypeStr = when(device.type) {
+                            BluetoothDevice.DEVICE_TYPE_CLASSIC -> "기본 블루투스"
+                            BluetoothDevice.DEVICE_TYPE_LE -> "블루투스 LE"
+                            BluetoothDevice.DEVICE_TYPE_DUAL -> "듀얼 모드"
+                            else -> "알 수 없음"
+                        }
+                        Text(
+                            text = "기기 타입: $deviceTypeStr",
+                            style = MaterialTheme.typography.body2
+                        )
+                    }
+                }
+                
+                if (uiState.isConnecting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
             }
         }
     }
@@ -522,12 +752,16 @@ private fun MessageInput(
     text: String,
     onTextChange: (String) -> Unit,
     onSendClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    imeHeight: androidx.compose.ui.unit.Dp = 0.dp
 ) {
+    val keyboardPadding = if (imeHeight > 0.dp) imeHeight else 16.dp
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(bottom = if (imeHeight > 0.dp) 0.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedTextField(
@@ -535,14 +769,18 @@ private fun MessageInput(
             onValueChange = onTextChange,
             placeholder = { Text("메시지 입력") },
             enabled = enabled,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(max = 120.dp), // 최대 높이 제한
+            maxLines = 3 // 최대 3줄까지만 표시
         )
         
         Spacer(modifier = Modifier.width(8.dp))
         
         Button(
             onClick = onSendClick,
-            enabled = enabled && text.isNotBlank()
+            enabled = enabled && text.isNotBlank(),
+            modifier = Modifier.padding(vertical = 4.dp)
         ) {
             Text("전송")
         }
@@ -551,7 +789,7 @@ private fun MessageInput(
 
 // Mesh 공용 채팅 내용
 @Composable
-fun MeshPublicChatContent(
+private fun MeshPublicChatContent(
     messages: List<MeshChatMessage>,
     localAddress: Int?,
     modifier: Modifier = Modifier
@@ -584,7 +822,7 @@ fun MeshPublicChatContent(
 
 // Mesh 개인 채팅 내용
 @Composable
-fun MeshPrivateChatContent(
+private fun MeshPrivateChatContent(
     messages: Map<Int, List<MeshChatMessage>>,
     currentPartner: Int?,
     localAddress: Int?,
@@ -652,7 +890,7 @@ fun MeshPrivateChatContent(
 
 // Mesh 채팅 상대 항목
 @Composable
-fun PartnerItem(
+private fun PartnerItem(
     address: Int,
     lastMessage: MeshChatMessage?,
     onClick: () -> Unit
@@ -699,7 +937,7 @@ fun PartnerItem(
 
 // Mesh 채팅 메시지 아이템
 @Composable
-fun MeshChatMessageItem(
+private fun MeshChatMessageItem(
     message: MeshChatMessage,
     isMyMessage: Boolean,
     modifier: Modifier = Modifier

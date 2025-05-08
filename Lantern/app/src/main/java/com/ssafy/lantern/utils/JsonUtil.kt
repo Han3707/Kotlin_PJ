@@ -1,45 +1,133 @@
 package com.ssafy.lantern.utils
 
+import android.util.Log
+import com.google.android.play.core.integrity.g
 import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
+import com.google.gson.reflect.TypeToken
 import com.ssafy.lantern.data.model.ChatMessage
+import java.lang.reflect.Type
+import java.nio.charset.StandardCharsets
 
 /**
- * 채팅 메시지와 바이트 배열 간의 변환을 처리하는 유틸리티 클래스
+ * JSON 변환 유틸리티 클래스
  */
 object JsonUtil {
-    private val gson = Gson()
+    public const val TAG = "JsonUtil"
+    public val gson = Gson()
     
     /**
-     * ChatMessage 객체를 바이트 배열로 변환
-     *
-     * @param msg 변환할 ChatMessage 객체
-     * @return 직렬화된 바이트 배열
+     * 채팅 메시지 객체를 JSON 문자열로 변환
      */
-    fun toBytes(msg: ChatMessage): ByteArray =
-        gson.toJson(msg).toByteArray(Charsets.UTF_8)
-
-    /**
-     * 바이트 배열을 ChatMessage 객체로 변환
-     *
-     * @param bytes 역직렬화할 바이트 배열
-     * @return 변환된 ChatMessage 객체
-     * @throws Exception JSON 변환 중 오류 발생 시
-     */
-    fun fromBytes(bytes: ByteArray): ChatMessage =
-        gson.fromJson(bytes.toString(Charsets.UTF_8), ChatMessage::class.java)
-        
-    /**
-     * 바이트 배열을 ChatMessage 객체로 안전하게 변환
-     * 예외 발생 시 null 반환
-     *
-     * @param bytes 역직렬화할 바이트 배열
-     * @return 변환된 ChatMessage 객체 또는 null (변환 실패 시)
-     */
-    fun fromBytesSafe(bytes: ByteArray): ChatMessage? {
+    fun toJson(message: Any): String {
         return try {
-            fromBytes(bytes)
+            val json = gson.toJson(message)
+            Log.d(TAG, "객체를 JSON으로 변환 성공: ${json.take(50)}${if (json.length > 50) "..." else ""}")
+            json
         } catch (e: Exception) {
+            Log.e(TAG, "객체를 JSON으로 변환 중 오류 발생", e)
+            // 기본 정보만 포함한 간단한 JSON 반환
+            "{\"error\":\"변환 오류\",\"message\":\"${e.message}\"}"
+        }
+    }
+    
+    /**
+     * JSON 문자열을 채팅 메시지 객체로 변환
+     */
+    fun fromJson(json: String): ChatMessage? {
+        return try {
+            val message = gson.fromJson(json, ChatMessage::class.java)
+            Log.d(TAG, "JSON을 객체로 변환 성공: $message")
+            message
+        } catch (e: JsonSyntaxException) {
+            Log.e(TAG, "JSON 구문 오류: $json", e)
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON을 객체로 변환 중 오류 발생", e)
             null
         }
+    }
+    
+    /**
+     * JSON 문자열을 지정된 타입의 객체로 변환 (제네릭 사용)
+     */
+    inline fun <reified T> fromJsonGeneric(json: String): T? {
+        return try {
+            val type: Type = object : TypeToken<T>() {}.type
+            val obj = gson.fromJson<T>(json, type)
+            Log.d(TAG, "JSON을 ${T::class.java.simpleName}으로 변환 성공: $obj")
+            obj
+        } catch (e: JsonSyntaxException) {
+            Log.e(TAG, "JSON 구문 오류 (${T::class.java.simpleName}): $json", e)
+            null
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON을 ${T::class.java.simpleName}으로 변환 중 오류 발생", e)
+            null
+        }
+    }
+    
+    /**
+     * JSON 문자열을 바이트 배열로 변환
+     */
+    fun toBytes(message: Any): ByteArray {
+        val json = toJson(message)
+        return try {
+            val bytes = json.toByteArray(StandardCharsets.UTF_8)
+            Log.d(TAG, "JSON을 바이트 배열로 변환 성공: ${bytes.size} 바이트")
+            bytes
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON을 바이트 배열로 변환 중 오류 발생", e)
+            ByteArray(0)
+        }
+    }
+    
+    /**
+     * 바이트 배열을 채팅 메시지 객체로 변환
+     */
+    fun fromBytes(bytes: ByteArray): ChatMessage? {
+        return try {
+            val json = String(bytes, StandardCharsets.UTF_8)
+            Log.d(TAG, "바이트 배열을 JSON으로 변환: ${json.take(50)}${if (json.length > 50) "..." else ""}")
+            fromJson(json)
+        } catch (e: Exception) {
+            Log.e(TAG, "바이트 배열을 JSON으로 변환 중 오류 발생", e)
+            null
+        }
+    }
+    
+    /**
+     * 바이트 배열을 지정된 타입의 객체로 변환 (제네릭 사용)
+     */
+    inline fun <reified T> fromBytesGeneric(bytes: ByteArray): T? {
+        return try {
+            val json = String(bytes, StandardCharsets.UTF_8)
+            Log.d(TAG, "바이트 배열을 JSON으로 변환 (Generic): ${json.take(50)}${if (json.length > 50) "..." else ""}")
+            fromJsonGeneric<T>(json)
+        } catch (e: Exception) {
+            Log.e(TAG, "바이트 배열을 JSON (Generic)으로 변환 중 오류 발생", e)
+            null
+        }
+    }
+    
+    /**
+     * 바이트 배열을 JSON 문자열로 변환
+     */
+    fun bytesToString(bytes: ByteArray): String {
+        return try {
+            val result = String(bytes, StandardCharsets.UTF_8)
+            Log.d(TAG, "바이트 배열을 문자열로 변환 성공: ${result.take(50)}${if (result.length > 50) "..." else ""}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "바이트 배열을 문자열로 변환 중 오류 발생", e)
+            "{\"error\":\"변환 오류\"}"
+        }
+    }
+    
+    /**
+     * 바이트 배열을 채팅 메시지 객체로 안전하게 변환
+     * fromBytes의 별칭으로 기존 코드와의 호환성을 위해 제공
+     */
+    fun fromBytesSafe(bytes: ByteArray): ChatMessage? {
+        return fromBytes(bytes)
     }
 } 

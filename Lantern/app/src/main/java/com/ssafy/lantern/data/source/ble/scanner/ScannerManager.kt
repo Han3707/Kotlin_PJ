@@ -38,7 +38,7 @@ class ScannerManager(
     }
 
     @SuppressLint("MissingPermission")
-    fun startScanning(callback: ScanCallback) {
+    fun startScanning(callback: ScanCallback, useFilter: Boolean = false) {
         this.scanCallback = callback
         if (isScanning) {
             Log.d("ScannerManager", "Scanning is already active.")
@@ -53,22 +53,33 @@ class ScannerManager(
             return
         }
 
-        val SERVICE_UUID = GattServerManager.SERVICE_UUID
-
-        val scanFilter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(SERVICE_UUID))
-            .build()
-
-        val scanFilters = listOf(scanFilter)
-
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setReportDelay(0) // 지연 없이 즉시 결과 보고
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE) // 적극적인 매칭 모드
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT) // 최대한 많은 기기 검색
             .build()
 
         try {
-            bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
+            // Lantern 앱이 설치된 기기만 검색하는 필터 설정
+            val SERVICE_UUID = GattServerManager.SERVICE_UUID
+            
+            if (useFilter) {
+                // 필터 적용 - Lantern 서비스 UUID가 있는 기기만 검색
+                val scanFilter = ScanFilter.Builder()
+                    .setServiceUuid(ParcelUuid(SERVICE_UUID))
+                    .build()
+                val scanFilters = listOf(scanFilter)
+                
+                Log.i("ScannerManager", "Scanning started with service UUID filter: $SERVICE_UUID")
+                bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
+            } else {
+                // 필터 없이 모든 BLE 기기 검색 (테스트 목적)
+                Log.i("ScannerManager", "Scanning started for all BLE devices (no filter)")
+                bluetoothLeScanner?.startScan(null, scanSettings, scanCallback)
+            }
+            
             isScanning = true
-            Log.i("ScannerManager", "Scanning started for service UUID: $SERVICE_UUID")
         } catch (e: Exception) {
             Log.e("ScannerManager", "Exception starting scan", e)
             isScanning = false

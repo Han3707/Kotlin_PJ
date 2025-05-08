@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.implementation
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -16,7 +18,7 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.ssafy.lantern"
-        minSdk = 33
+        minSdk = 31
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -92,9 +94,12 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Nordic BLE Mesh 라이브러리 추가 (버전 업데이트)
-    implementation("no.nordicsemi.android:mesh:3.3.4") 
+    implementation("no.nordicsemi.android:mesh:3.3.4")
     implementation("no.nordicsemi.android.support.v18:scanner:1.6.0")
-    implementation("no.nordicsemi.android:ble:2.6.1")
+    implementation("no.nordicsemi.android:ble:2.10.0")
+
+
+
     // 블루투스 리소스 추가
     implementation("androidx.core:core-ktx:1.12.0")
 
@@ -131,4 +136,8 @@ dependencies {
 
     // Accompanist Permissions (권한 요청 UI)
     implementation("com.google.accompanist:accompanist-permissions:0.34.0") // 최신 버전 확인
+    
+    // Accompanist Insets (시스템 UI 인셋 처리)
+    implementation("com.google.accompanist:accompanist-insets:0.30.1")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.30.1")
 }

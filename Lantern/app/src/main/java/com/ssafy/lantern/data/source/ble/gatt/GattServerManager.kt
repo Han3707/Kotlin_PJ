@@ -109,7 +109,7 @@ class GattServerManager (
     private val gattServerCallback = object : BluetoothGattServerCallback(){
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int){
             Log.d("GattServerManager", "onConnectionStateChange: Device ${device.address}, Status $status, NewState $newState")
-            onConnectionStateChange(device, status, newState)
+            this@GattServerManager.onConnectionStateChange(device, status, newState)
 
             if(newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.i("GattServerManager", "Device connected: ${device.address}")

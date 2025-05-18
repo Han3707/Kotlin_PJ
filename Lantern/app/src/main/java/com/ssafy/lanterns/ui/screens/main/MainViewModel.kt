@@ -6,6 +6,7 @@ import android.content.Context
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Handler
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +16,8 @@ import com.ssafy.lanterns.service.ble.advertiser.NeighborAdvertiser
 import com.ssafy.lanterns.service.ble.scanner.NeighborScanner
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
 import com.ssafy.lanterns.utils.PermissionHelper
+import com.ssafy.lanterns.config.BleConstants
+import com.ssafy.lanterns.config.NeighborDiscoveryConstants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -49,7 +52,9 @@ data class MainScreenState(
     val isBluetoothEnabled: Boolean = false,     // 블루투스 활성화 상태
 
     // 프로필 이동용 userId
-    val navigateToProfile: String? = null
+    val navigateToProfile: String? = null,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0
 )
 
 @HiltViewModel
@@ -67,8 +72,8 @@ class MainViewModel @Inject constructor(
         private const val AI_ACTIVATION_DEBOUNCE_MS = 2_000L // AI 활성화 디바운스 시간 (ms)
         
         // BLE 상수
-        private const val BLE_SCAN_INTERVAL = 3 * 1000L // 3초마다 스캔 결과 업데이트
-        private const val ADVERTISE_INTERVAL = 20 * 1000L // 20초마다 광고 갱신
+        private const val BLE_SCAN_INTERVAL = 2 * 1000L // 2초마다 스캔 결과 업데이트 (3초→2초)
+        private const val ADVERTISE_INTERVAL = 10 * 1000L // 10초마다 광고 갱신 (20초→10초)
         
         // 최소 위치 업데이트 시간 (밀리초)
         private const val MIN_LOCATION_UPDATE_TIME = 10000L
@@ -120,6 +125,9 @@ class MainViewModel @Inject constructor(
     // 위치 리스너 (onCleared에서 해제 가능하도록 클래스 변수로 선언)
     private var locationListener: LocationListener? = null
 
+    private lateinit var handler: Handler
+    private lateinit var advertiseRunnable: Runnable
+
     /* -------------------------------------------------- *
      * init
      * -------------------------------------------------- */
@@ -127,6 +135,13 @@ class MainViewModel @Inject constructor(
         // ViewModel 생성 시 자동 스캔 시작 (권한/BLE 상태는 화면에서 설정)
         // 실제 BLE 스캔은 updateBlePermissionStatus()에서 권한 확인 후 시작됨
         startScanning()
+
+        handler = Handler()
+        advertiseRunnable = object : Runnable {
+            override fun run() {
+                startAdvertising()
+            }
+        }
     }
     
     /* -------------------------------------------------- *
@@ -168,8 +183,9 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "로컬 DB에서 사용자 정보 로드: ID=$userId, 닉네임=$myNickname")
                 } else {
                     // 사용자 정보가 없는 경우 기본값 설정
-                    myNickname = "Guest_${UUID.randomUUID().toString().substring(0, 4)}"
-                    Log.d(TAG, "로컬 DB에 사용자 정보 없음, 임시 닉네임 사용: $myNickname")
+                    userId = UUID.randomUUID().toString()
+                    myNickname = "Guest_${userId.substring(0, 4)}"
+                    Log.d(TAG, "로컬 DB에 사용자 정보 없음, 임시 닉네임/ID 생성: $myNickname / $userId")
                 }
                 
                 // 사용자 기기 정보 등록/업데이트
@@ -177,7 +193,8 @@ class MainViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "사용자 정보 로드 실패: ${e.message}")
                 // 오류 시 기본 닉네임 설정
-                myNickname = "Error_${UUID.randomUUID().toString().substring(0, 4)}"
+                userId = UUID.randomUUID().toString()
+                myNickname = "Error_${userId.substring(0, 4)}"
             }
         }
     }
@@ -433,41 +450,47 @@ class MainViewModel @Inject constructor(
     private fun startAdvertising() {
         activity?.let { act ->
             // 고정 deviceId 사용 (기기의 MAC 주소 또는 고유 ID)
-            val deviceId = android.os.Build.SERIAL.ifEmpty { 
-                act.getSystemService(Context.BLUETOOTH_SERVICE)?.let {
-                    (it as BluetoothManager).adapter?.address
-                } ?: UUID.randomUUID().toString()
-            }
+            val deviceId = getDeviceId(act)
             
-            // 광고 시작
+            // 코루틴 내에서 실행하여 withLock 사용
             viewModelScope.launch {
-                val lat: Double
-                val lng: Double
-                
                 // 위치 정보 접근 시 mutex 사용
+                var currentLat: Double
+                var currentLng: Double
+                
                 locationMutex.withLock {
-                    lat = myLatitude
-                    lng = myLongitude
+                    currentLat = _uiState.value.lat
+                    currentLng = _uiState.value.lng
                 }
                 
+                // myNickname 사용 (이미 UserRepository에서 로드한 사용자 닉네임)
+                val nickname = if (myNickname.isBlank()) "사용자" else myNickname
+                
+                // 디버깅 로깅 - 광고 업데이트
+                Log.d(TAG, "광고 업데이트 - 기기ID: $deviceId, 닉네임: $nickname, 위치: $currentLat, $currentLng")
+                
+                // NeighborAdvertiser를 통해 광고
                 NeighborAdvertiser.startAdvertising(
-                    nickname = myNickname,
-                    deviceId = deviceId,  // 고정 deviceId 사용
-                    lat = lat,
-                    lng = lng,
-                    state = 0,
+                    nickname = nickname,
+                    deviceId = deviceId,
+                    lat = currentLat,
+                    lng = currentLng,
+                    state = 0, // 기본 상태 (향후 확장 가능)
                     activity = act
                 )
             }
             
-            // 주기적으로 광고 갱신
-            advertisingJob = viewModelScope.launch {
-                while (true) {
-                    delay(ADVERTISE_INTERVAL)
-                    updateAdvertising()
-                }
-            }
+            // 다음 광고 갱신 예약
+            handler.postDelayed(advertiseRunnable, ADVERTISE_INTERVAL)
         }
+    }
+    
+    /** 
+     * 디바이스 고유 ID 획득 
+     * - 기기의 고유 ID 또는 MAC 주소 반환
+     */
+    private fun getDeviceId(activity: Activity): String {
+        return com.ssafy.lanterns.utils.DeviceIdentifier.getDeviceId(activity.applicationContext)
     }
     
     /** 
@@ -477,11 +500,7 @@ class MainViewModel @Inject constructor(
     private fun updateAdvertising() {
         activity?.let { act ->
             // 고정 deviceId 사용 (기기의 MAC 주소 또는 고유 ID)
-            val deviceId = android.os.Build.SERIAL.ifEmpty { 
-                act.getSystemService(Context.BLUETOOTH_SERVICE)?.let {
-                    (it as BluetoothManager).adapter?.address
-                } ?: UUID.randomUUID().toString()
-            }
+            val deviceId = getDeviceId(act)
             
             viewModelScope.launch {
                 val lat: Double
@@ -489,9 +508,11 @@ class MainViewModel @Inject constructor(
                 
                 // 위치 정보 접근 시 mutex 사용
                 locationMutex.withLock {
-                    lat = myLatitude
-                    lng = myLongitude
+                    lat = _uiState.value.lat
+                    lng = _uiState.value.lng
                 }
+                
+                Log.d(TAG, "광고 업데이트 - 기기ID: $deviceId, 닉네임: $myNickname, 위치: $lat, $lng")
                 
                 NeighborAdvertiser.startAdvertising(
                     nickname = myNickname,
@@ -508,195 +529,110 @@ class MainViewModel @Inject constructor(
     /** 
      * 스캔 결과 처리 
      * - BLE 스캔으로 수집한 주변 사람 정보 처리
-     * - GPS와 RSSI 정보를 조합하여 정확한 거리 및 방향 계산
+     * - RSSI 기반 연결 강도 계산 및 거리 추정
      */
     private fun processScanResults() {
         viewModelScope.launch {
+            // 발견된 사용자 수 로깅
+            Log.d(TAG, "BLE 스캔 결과 처리 - 발견된 사용자 수: ${NeighborScanner.userMap.size}")
+            
             val newNearbyList = mutableListOf<NearbyPerson>()
             val currentTime = System.currentTimeMillis()
             
-            // 닉네임 기반으로 중복을 관리하기 위한 맵
-            val nicknameBasedData = mutableMapOf<String, Pair<NeighborScanner.NearbyUser, Float>>() // <nickname, <user, distance>>
-            
-            // 현재 위치 정보 가져오기 (스레드 안전)
-            val lat: Double
-            val lng: Double
-            locationMutex.withLock {
-                lat = myLatitude
-                lng = myLongitude
+            // 스캐너의 사용자 맵 복사본 생성 (스레드 안전)
+            val userMapCopy = NeighborScanner.userMap.toMap()
+
+            // 발견된 사용자가 없는 경우 빈 목록 반환
+            if (userMapCopy.isEmpty()) {
+                Log.d(TAG, "발견된 사용자가 없습니다.")
+                _uiState.update { currentState -> 
+                    currentState.copy(nearbyPeople = emptyList())
+                }
+                return@launch
             }
-            Log.d(TAG, "현재 기기 위치 - lat: $lat, lng: $lng")
             
-            // NeighborScanner의 사용자 맵에서 데이터 가져오기 (동기화 블록 사용)
-            val userMapCopy = NeighborScanner.userMap.toMap() // 스냅샷 복사
+            // 닉네임 기반으로 중복을 관리하기 위한 맵
+            val nicknameBasedData = mutableMapOf<String, Pair<NeighborScanner.NearbyUser, Int>>() // <nickname, <user, signalLevel>>
             
-            userMapCopy.forEach { (deviceId, user) ->
-                // 30초 이내에 수신된 데이터만 처리 (시간 임계값 증가)
+            userMapCopy.forEach { (bleId, user) ->
+                // 30초 이내에 수신된 데이터만 처리
                 if (currentTime - user.lastSeen < 30000) {
-                    // RSSI 기반 거리 계산 - Path Loss Model 사용
-                    // d = 10^((RSSI0 - RSSI) / (10 * n))
-                    val rssi = user.rssi
-                    val rssi0 = -59  // 1m 거리에서의 기준 RSSI 값
-                    val pathLossExponent = 2.2  // 실내 환경에서의 경로 손실 지수 (일반적으로 2.0-4.0)
+                    // RSSI 값 필터링 (이동 평균 적용)
+                    val smoothedRssi = com.ssafy.lanterns.utils.SignalStrengthManager.getSmoothedRssi(bleId, user.rssi)
                     
-                    // RSSI 값이 유효한 경우에만 계산
-                    val rssiDistance = if (rssi != 0 && rssi != -127) {
-                        Math.pow(10.0, (rssi0 - rssi) / (10 * pathLossExponent)).toFloat()
-                    } else {
-                        50f // 기본값 (RSSI 값이 없는 경우)
-                    }
-                    Log.d(TAG, "사용자 ${user.nickname} (${user.deviceId}) - RSSI: $rssi, rssiDistance: $rssiDistance m")
+                    // 신호 강도 레벨 계산 (1-3)
+                    val signalLevel = com.ssafy.lanterns.utils.SignalStrengthManager.calculateSignalLevel(smoothedRssi)
                     
-                    // GPS 거리 계산 (좌표 기반)
-                    val userLatitude = user.lat.toDouble()
-                    val userLongitude = user.lng.toDouble()
-                    val gpsDistance = calculateDistance(lat, lng, userLatitude, userLongitude)
-                    Log.d(TAG, "사용자 ${user.nickname} (${user.deviceId}) - GPS lat: $userLatitude, lng: $userLongitude, gpsDistance: $gpsDistance m (받은 user.lat: ${user.lat}, user.lng: ${user.lng})")
+                    // 대략적인 거리 계산 (미터)
+                    val rssiDistance = com.ssafy.lanterns.utils.SignalStrengthManager.rssiToDistance(smoothedRssi)
                     
-                    // 칼만 필터 개념 활용 - RSSI와 GPS 거리의 가중 평균 계산
-                    // RSSI는 가까운 거리에서 더 정확하고, GPS는 먼 거리에서 더 정확
-                    val rssiWeight = if (rssiDistance < 10) 0.7f else 0.3f
-                    val gpsWeight = 1.0f - rssiWeight
-                    Log.d(TAG, "사용자 ${user.nickname} (${user.deviceId}) - rssiWeight: $rssiWeight, gpsWeight: $gpsWeight")
+                    Log.d(TAG, "사용자 ${user.nickname} (${bleId}) - RSSI: ${user.rssi}, 필터링된 RSSI: $smoothedRssi, 신호 레벨: $signalLevel, 추정 거리: $rssiDistance m")
                     
-                    // 최종 거리 계산 (가중 평균)
-                    val rawDistance = (rssiDistance * rssiWeight + gpsDistance * gpsWeight)
-                    Log.d(TAG, "사용자 ${user.nickname} (${user.deviceId}) - 최종 rawDistance: $rawDistance m (기존 로그: ${user.nickname} 원시 거리: $rawDistance, RSSI: $rssi)")
-                    
-                    // 거리를 카테고리화하여 표현 (10, 30, 50, 100, 150, 200, 200+)
-                    val categorizedDistance = when {
-                        rawDistance < 10f -> 10f
-                        rawDistance < 30f -> 30f
-                        rawDistance < 50f -> 50f
-                        rawDistance < 100f -> 100f
-                        rawDistance < 150f -> 150f
-                        rawDistance < 200f -> 200f
-                        else -> 250f // 200m 초과 표현용
-                    }
-                    Log.d(TAG, "사용자 ${user.nickname} (${user.deviceId}) - 최종 categorizedDistance: $categorizedDistance m (기존 로그: ${user.nickname} 카테고리화된 거리: $categorizedDistance)")
-                    
-                    // 닉네임 기반으로 더 가까운 정보를 선택하여 저장
+                    // 닉네임 기반으로 더 강한 신호를 선택하여 저장
                     val currentPair = nicknameBasedData[user.nickname]
-                    if (currentPair == null || categorizedDistance < currentPair.second) {
-                        nicknameBasedData[user.nickname] = Pair(user, categorizedDistance)
+                    if (currentPair == null || signalLevel > currentPair.second) {
+                        // 이 사용자를 표시에 사용
+                        nicknameBasedData[user.nickname] = Pair(user, signalLevel)
                     }
                 }
             }
             
             // 닉네임 기반으로 정리된 데이터를 처리
             nicknameBasedData.forEach { (nickname, userData) ->
-                val (user, distance) = userData
+                val (user, signalLevel) = userData
                 
-                val angle = calculateBearing(
-                    lat, lng,
-                    user.lat / 1e6, user.lng / 1e6
-                )
+                // RSSI를 이용한 거리 추정
+                val smoothedRssi = com.ssafy.lanterns.utils.SignalStrengthManager.getSmoothedRssi(user.bleId, user.rssi)
+                val estimatedDistance = com.ssafy.lanterns.utils.SignalStrengthManager.rssiToDistance(smoothedRssi)
                 
-                val signalStrength = calculateSignalStrength(user.rssi)
+                // 임의의 각도 할당 (시간 기반) - 시각적 표현용
+                val angle = (System.nanoTime() % 360).toFloat()
                 
                 // 유효한 사용자 이름이 없는 경우 대비
                 val displayName = if (user.nickname.isNullOrBlank()) "사용자" else user.nickname
                 
+                // 신호 강도에 따른 시각적 표현 계산
+                val normalizedSignalStrength = when (signalLevel) {
+                    3 -> 1.0f       // 강한 신호 (최대)
+                    2 -> 0.66f      // 중간 신호
+                    else -> 0.33f   // 약한 신호
+                }
+                
+                // Debug logging
+                Log.d(TAG, "사용자 배치: $displayName, 각도: $angle°, 신호 레벨: $signalLevel, 추정 거리: ${estimatedDistance}m")
+                
+                // 신호 강도에 따라 시각적 거리 범주화
+                val categorizedDistance = when (signalLevel) {
+                    3 -> 5f      // 강한 신호 - 가까운 거리
+                    2 -> 10f     // 중간 신호 - 중간 거리
+                    else -> 20f  // 약한 신호 - 먼 거리
+                }
+                
                 // nearbyPeople 목록에 추가
                 newNearbyList.add(
                     NearbyPerson(
-                        id = user.deviceId.hashCode(),
-                        userId = user.deviceId,
+                        bleId = user.bleId,
+                        userId = user.bleId.hashCode().toLong(),
                         name = displayName,
-                        distance = distance, // 카테고리화된 거리 사용
+                        distance = categorizedDistance, // 신호 강도 기반 거리
                         angle = angle,
-                        signalStrength = signalStrength,
-                        rssi = user.rssi // RSSI 값 전달
+                        signalStrength = normalizedSignalStrength, // 0.33, 0.66, 1.0 범위로 정규화
+                        rssi = smoothedRssi, // 필터링된 RSSI 값
+                        signalLevel = signalLevel // 신호 강도 레벨 (1-3)
                     )
                 )
             }
             
-            // 거리 순으로 정렬
-            newNearbyList.sortBy { it.distance }
+            // 신호 강도 순으로 정렬
+            newNearbyList.sortByDescending { it.signalLevel }
             
-            // 동기화 블록 내에서 로컬 맵 업데이트
-            nearbyUsersMutex.withLock {
-                nearbyUsersMap.clear()
-                newNearbyList.forEach { person ->
-                    nearbyUsersMap[person.userId] = person
-                }
-            }
-            
-            // UI 상태 업데이트 (원자적 연산)
+            // UI 상태 업데이트
             _uiState.update { currentState -> 
                 currentState.copy(nearbyPeople = newNearbyList)
             }
         }
     }
     
-    /**
-     * RSSI 값으로부터 신호 강도 계산 (0.0 ~ 1.0)
-     */
-    private fun calculateSignalStrength(rssi: Int): Float {
-        // RSSI 값은 일반적으로 -30 (매우 강함) ~ -100 (매우 약함) 범위
-        return if (rssi == 0 || rssi == -127) {
-            0.3f // 기본값
-        } else {
-            val normalized = (rssi + 100) / 70f // -100 -> 0, -30 -> 1
-            normalized.coerceIn(0f, 1f)
-        }
-    }
-
-    /**
-     * 거리 계산 (하버사인 공식)
-     * - 두 지리적 좌표 간의 거리를 계산하는 함수
-     * - 지구의 곡률을 고려한 정확한 거리 계산 제공
-     * 
-     * @param lat1 첫 번째 지점의 위도
-     * @param lon1 첫 번째 지점의 경도
-     * @param lat2 두 번째 지점의 위도
-     * @param lon2 두 번째 지점의 경도
-     * @return 두 지점 간의 거리 (미터 단위)
-     */
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
-        val R = 6371e3 // 지구 반지름 (미터)
-        val φ1 = Math.toRadians(lat1)
-        val φ2 = Math.toRadians(lat2)
-        val Δφ = Math.toRadians(lat2 - lat1)
-        val Δλ = Math.toRadians(lon2 - lon1)
-
-        val a = sin(Δφ / 2) * sin(Δφ / 2) +
-                cos(φ1) * cos(φ2) *
-                sin(Δλ / 2) * sin(Δλ / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return (R * c).toFloat() // 미터 단위 거리
-    }
-
-    /**
-     * 방위각 계산 (북쪽 기준)
-     * - 두 지리적 좌표 간의 방위각을 계산하는 함수
-     * - 북쪽 기준 시계 방향 각도 (0-360도) 반환
-     * 
-     * @param lat1 첫 번째 지점의 위도
-     * @param lon1 첫 번째 지점의 경도
-     * @param lat2 두 번째 지점의 위도
-     * @param lon2 두 번째 지점의 경도
-     * @return 방위각 (도 단위, 0-360)
-     */
-    private fun calculateBearing(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
-        val dLon = lon2 - lon1
-        
-        val y = sin(Math.toRadians(dLon)) * cos(Math.toRadians(lat2))
-        val x = cos(Math.toRadians(lat1)) * sin(Math.toRadians(lat2)) - 
-                sin(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * cos(Math.toRadians(dLon))
-        
-        // atan2로 각도 계산 (라디안)
-        var bearing = Math.toDegrees(atan2(y, x))
-        
-        // 각도를 0-360 범위로 조정
-        if (bearing < 0) {
-            bearing += 360.0
-        }
-        
-        return bearing.toFloat()
-    }
-
     /**
      * BLE 스캔 시작 함수
      * - 사용자가 스캔 버튼을 누를 때 호출

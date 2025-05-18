@@ -2,7 +2,7 @@ package com.ssafy.lanterns.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.ssafy.lanterns.data.model.user.User
+import com.ssafy.lanterns.data.model.User
 import com.ssafy.lanterns.data.source.local.dao.CallListDao
 import com.ssafy.lanterns.data.source.local.dao.ChatRoomDao
 import com.ssafy.lanterns.data.source.local.dao.FollowDao

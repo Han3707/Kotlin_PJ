@@ -71,13 +71,12 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.runtime.DisposableEffect
-import com.ssafy.lanterns.data.model.chat.ChatMessage
-import com.ssafy.lanterns.data.model.user.User
+import com.ssafy.lanterns.data.model.Message
+import com.ssafy.lanterns.data.model.User
 import com.ssafy.lanterns.ui.screens.main.MainViewModel
 import com.ssafy.lanterns.service.ble.GlobalBleManager
 import android.app.Activity
 import com.ssafy.lanterns.data.model.MessageStatus
-import com.ssafy.lanterns.data.model.Message
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

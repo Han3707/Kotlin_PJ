@@ -140,11 +140,11 @@ fun NearbyPersonListModal(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(people.sortedBy { it.distance }) { person ->
+                            items(people.sortedByDescending { it.signalLevel }) { person ->
                                 PersonListItemWithButtons(
                                     person = person,
-                                    onChatClick = { onPersonClick(person.userId) },
-                                    onCallClick = { onCallClick(person.userId) }
+                                    onChatClick = { onPersonClick(person.bleId) },
+                                    onCallClick = { onCallClick(person.bleId) }
                                 )
                             }
                         }
@@ -157,7 +157,7 @@ fun NearbyPersonListModal(
 
 /**
  * 주변 사람 목록 아이템 (채팅 및 통화 버튼 포함)
- * - 간소화된 UI: 프로필 이미지, 닉네임, 거리, 채팅/통화 버튼만 표시
+ * - 간소화된 UI: 프로필 이미지, 닉네임, 신호 강도, 채팅/통화 버튼 표시
  */
 @Composable
 fun PersonListItemWithButtons(
@@ -165,27 +165,21 @@ fun PersonListItemWithButtons(
     onChatClick: () -> Unit,
     onCallClick: () -> Unit
 ) {
-    val connectionColor = getConnectionColorByDistance(person.distance)
-    
-    // 통화 버튼은 100m 이내의 사용자에게만 활성화
-    val isCallEnabled = person.distance <= 100f
-    
-    // 거리 표시 형식 개선: 10m, 30m, 50m, 100m, 150m, 200m 카테고리로 나눔
-    val distanceText = when (person.distance.toInt()) {
-        10 -> "10m 이내"
-        30 -> "30m 이내"
-        50 -> "50m 이내"
-        100 -> "100m 이내"
-        150 -> "150m 이내"
-        200 -> "200m 이내"
-        else -> "200m 초과"
+    // 신호 강도 레벨에 따른 색상 및 활성화 상태 결정
+    val signalColor = when (person.signalLevel) {
+        3 -> Color.Green     // 강한 신호
+        2 -> Color.Yellow    // 중간 신호
+        else -> Color.Red    // 약한 신호
     }
     
-    // 거리에 따른 색상 지정: 100m 이하(초록), 200m 이하(노랑), 200m 초과(빨강)
-    val distanceColor = when {
-        person.distance <= 100f -> Color(0xFF21AA73) // ConnectionNear (녹색)
-        person.distance <= 200f -> Color(0xFFFFD700) // ConnectionMedium (노란색)
-        else -> Color(0xFFFF5252) // ConnectionFar (빨간색)
+    // 통화 버튼은 신호 강도 2 이상인 사용자에게만 활성화
+    val isCallEnabled = person.signalLevel >= 2
+    
+    // 신호 강도 텍스트
+    val signalText = when (person.signalLevel) {
+        3 -> "강한 신호"
+        2 -> "중간 신호"
+        else -> "약한 신호"
     }
     
     Card(
@@ -234,19 +228,21 @@ fun PersonListItemWithButtons(
                 
                 Spacer(modifier = Modifier.height(4.dp))
                 
-                // 거리 정보
-                Box(
-                    modifier = Modifier
-                        .background(
-                            color = distanceColor.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                // 신호 강도 정보 (RSSI 기반)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // 신호 강도 표시기
+                    SignalStrengthIndicator(
+                        level = person.signalLevel
+                    )
+                    
+                    // 신호 강도 텍스트
                     Text(
-                        text = distanceText,
+                        text = signalText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = distanceColor
+                        color = signalColor
                     )
                 }
             }
@@ -273,7 +269,7 @@ fun PersonListItemWithButtons(
                     )
                 }
                 
-                // 통화 버튼 (조건부 활성화)
+                // 통화 버튼 (신호 강도에 따라 활성화)
                 IconButton(
                     onClick = onCallClick,
                     enabled = isCallEnabled,

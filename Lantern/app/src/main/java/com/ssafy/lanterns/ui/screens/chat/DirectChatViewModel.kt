@@ -117,7 +117,7 @@ class DirectChatViewModel @Inject constructor(
             try {
                 // ChatRoom을 가져오거나 생성하는 로직 (getOrCreateChatRoom)
                 val chatRoom = chatRepository.getOrCreateChatRoom(chatRoomId, currentUser.userId, targetUserId)
-                Log.d("DirectChatVM", "ChatRoom loaded/created: ID=${chatRoom.id}, Participant=${chatRoom.participantId}")
+                Log.d("DirectChatVM", "ChatRoom loaded/created: ID=${chatRoom.chatRoomId}, Participant=${chatRoom.participantId}")
 
                 // 상대방 정보 로드 (chatRoom.participantId 사용)
                 val participant = userRepository.getUserById(chatRoom.participantId)

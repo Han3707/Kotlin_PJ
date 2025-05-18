@@ -15,8 +15,11 @@ import android.os.Looper
 import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.ssafy.lanterns.service.ble.advertiser.GlobalApplication
 import java.util.UUID
 import kotlin.math.absoluteValue
+import com.ssafy.lanterns.config.BleConstants
+import com.ssafy.lanterns.config.NeighborDiscoveryConstants
 
 object NeighborAdvertiser{
     private const val TAG = "NeighborAdvertiser"
@@ -27,21 +30,24 @@ object NeighborAdvertiser{
     private var isAdvertising = false
     
     // 닉네임 최대 길이 제한 (바이트 수)
-    private const val MAX_NICKNAME_LENGTH = 6
+    private const val MAX_NICKNAME_LENGTH = NeighborDiscoveryConstants.MAX_NICKNAME_LENGTH_BYTES
     // 해시 길이 제한 (3자리)
-    private const val HASH_LENGTH = 3
+    private const val HASH_LENGTH = NeighborDiscoveryConstants.DEVICE_ID_HASH_LENGTH
     
     // 제조사 ID 상수 정의
-    private const val MANUFACTURER_ID_USER = 0xFFFF
-    private const val MANUFACTURER_ID_LOCATION = 0xFFFE
+    private const val MANUFACTURER_ID_USER = BleConstants.MANUFACTURER_ID_USER
+    private const val MANUFACTURER_ID_LOCATION = BleConstants.MANUFACTURER_ID_LOCATION
     
     // 광고 재시도 간격 및 횟수
-    private const val RETRY_DELAY = 1000L // 1초로 증가 (100ms에서 변경)
+    private const val RETRY_DELAY = 500L // ms
     private const val MAX_RETRY_COUNT = 3
     private var retryCount = 0
     
     // 광고 설정 상수
-    private const val ADVERTISE_INTERVAL = 4000 // 4초 간격으로 설정 (요구사항)
+    private const val ADVERTISE_INTERVAL = 3000 // 3초 간격으로 단축 (4초→3초)
+    
+    // 광고 패킷 2개 활용을 위한 상수
+    private const val USE_SCAN_RESPONSE = true // 스캔 응답 패킷 활용 (총 62바이트까지 가능)
     
     // 마지막 광고 데이터 캐싱용 변수들
     private var lastNickname = ""
@@ -131,8 +137,8 @@ object NeighborAdvertiser{
             val shortHash = deviceId.hashCode().absoluteValue.toString().takeLast(HASH_LENGTH)
             
             // 3. 위치 정보 정밀도 감소 (소수점 3자리 = 약 110m 정확도)
-            val microLat = (lat * 1e3).toInt()
-            val microLng = (lng * 1e3).toInt()
+            val microLat = (lat * NeighborDiscoveryConstants.LOCATION_MULTIPLIER).toInt()
+            val microLng = (lng * NeighborDiscoveryConstants.LOCATION_MULTIPLIER).toInt()
             
             // 4. 데이터 분리 및 최적화
             // 닉네임과 해시 결합 (닉네임#해시,상태) - 간단하게 축약
@@ -156,34 +162,29 @@ object NeighborAdvertiser{
             // 데이터 크기 확인 로깅
             Log.d(TAG, "광고 데이터 크기 - 사용자 정보: ${userInfoData.size}바이트, 위치: ${locationData.size}바이트")
             
-            // 광고 설정 - 요구사항에 맞게 변경 (광고 간격 4000ms, 모드 BALANCED)
+            // 광고 설정 - 요구사항에 맞게 변경 (광고 간격 3000ms, 모드 LOW_LATENCY)
             val settings = AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED) // 요구사항대로 BALANCED 모드로 변경
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM) // HIGH에서 MEDIUM으로 변경하여 배터리 절약
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY) // BALANCED → LOW_LATENCY로 변경
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH) // MEDIUM → HIGH로 변경하여 범위 확장
                 .setConnectable(false) // 연결 불필요
                 .setTimeout(0) // 시간제한 없음 (계속 광고)
                 .build()
             
-            // 광고 데이터 설정
+            // 메인 광고 데이터 설정 (주 광고 패킷에 사용자 정보 포함)
             val advertiseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false) // 기기 이름 제외 (데이터 절약)
                 .setIncludeTxPowerLevel(false) // 전송 출력 제외 (데이터 절약)
                 .addManufacturerData(MANUFACTURER_ID_USER, userInfoData) // 사용자 정보
-                
-                // 데이터 크기 제한으로 인해 위치 정보를 포함할 수 없는 경우를 대비해 체크
-                // 제조사 데이터 헤더는 각각 4바이트 차지 (2바이트 ID + 2바이트 헤더)
-                .apply {
-                    // 전체 가용공간 = 31바이트 - (4바이트 헤더 + userInfoData.size)
-                    // 위치 데이터에 필요한 공간 = 4바이트 헤더 + locationData.size
-                    val totalSize = 4 + userInfoData.size + 4 + locationData.size
-                    if (totalSize <= 31) {
-                        addManufacturerData(MANUFACTURER_ID_LOCATION, locationData) // 위치 정보
-                        Log.d(TAG, "전체 광고 데이터 크기: $totalSize 바이트 (31바이트 제한)")
-                    } else {
-                        Log.w(TAG, "위치 정보를 포함하면 광고 데이터 크기 제한을 초과하므로 위치 정보 제외 (필요: $totalSize 바이트)")
-                    }
-                }
                 .build()
+            
+            // 스캔 응답 데이터 설정 (스캔 응답 패킷에 위치 정보 포함)
+            val scanResponseData = AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .setIncludeTxPowerLevel(false)
+                .addManufacturerData(MANUFACTURER_ID_LOCATION, locationData) // 위치 정보
+                .build()
+            
+            Log.d(TAG, "광고 데이터 분할 - 메인 패킷: 사용자 정보 ${userInfoData.size}바이트, 스캔 응답: 위치 정보 ${locationData.size}바이트")
             
             // 재시도 카운터 초기화
             retryCount = 0
@@ -191,7 +192,8 @@ object NeighborAdvertiser{
             // 콜백 설정
             val advertiseCallback = object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-                    Log.d(TAG, "광고 시작 성공: $trimmedNickname#$shortHash")
+                    Log.d(TAG, "광고 시작 성공: $trimmedNickname#$shortHash (사용자 정보: ${userInfoData.size}바이트, 위치 정보: ${locationData.size}바이트)")
+                    Log.d(TAG, "광고 위치 정보 확인: lat=${lat}, lng=${lng} → 인코딩 후 lat=${microLat}/1000=${microLat/1000.0}, lng=${microLng}/1000=${microLng/1000.0}")
                     lastAdvertiseCallback = this
                     isAdvertising = true
                 }
@@ -287,17 +289,22 @@ object NeighborAdvertiser{
                 }
             }
             
-            // 광고 시작
-            this.advertiseCallback = advertiseCallback
+            // 광고 시작 (메인 패킷 + 스캔 응답 패킷)
             try {
-                bluetoothLeAdvertiser.startAdvertising(settings, advertiseData, advertiseCallback)
-                Log.i(TAG, "BLE 광고 시작: $userInfoStr")
-            } catch (se: SecurityException) {
-                Log.e(TAG, "BLE 광고 권한이 없습니다: ${se.message}")
-                isAdvertising = false
+                bluetoothLeAdvertiser.startAdvertising(settings, advertiseData, scanResponseData, advertiseCallback)
+                Log.d(TAG, "BLE 광고 시작 요청 완료 (메인+스캔응답)")
             } catch (e: Exception) {
-                Log.e(TAG, "BLE 광고 시작 중 오류: ${e.message}")
-                isAdvertising = false
+                Log.e(TAG, "BLE 광고 시작 중 예외 발생: ${e.message}")
+                
+                // 예외 발생 시 스캔 응답 없이 다시 시도
+                if (USE_SCAN_RESPONSE && e.message?.contains("data too large", ignoreCase = true) == true) {
+                    Log.d(TAG, "스캔 응답 없이 메인 광고 패킷만으로 재시도")
+                    try {
+                        bluetoothLeAdvertiser.startAdvertising(settings, advertiseData, advertiseCallback)
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "메인 광고 패킷만으로도 시작 실패: ${e2.message}")
+                    }
+                }
             }
             
         } catch (e: Exception) {
@@ -367,9 +374,4 @@ object NeighborAdvertiser{
     fun isAdvertising(): Boolean {
         return isAdvertising
     }
-}
-
-// GlobalApplication 클래스 (컨텍스트 접근용) - 실제 프로젝트에 맞게 수정 필요
-object GlobalApplication {
-    var appContext: Context? = null
 }

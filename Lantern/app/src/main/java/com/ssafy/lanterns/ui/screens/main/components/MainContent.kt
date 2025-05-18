@@ -144,15 +144,12 @@ fun MainContent(
             val minRadius = 120.0 // 중앙 버튼과 겹치지 않는 최소 반경
             val maxRadius = 220.0 // 화면 내에 표시되는 최대 반경
             
-            // 거리에 따라 반경 계산 (카테고리화된 거리 사용)
-            val distanceRatio = when {
-                person.distance <= 10f -> 0.1
-                person.distance <= 30f -> 0.2
-                person.distance <= 50f -> 0.3
-                person.distance <= 100f -> 0.5
-                person.distance <= 150f -> 0.7
-                person.distance <= 200f -> 0.9
-                else -> 1.0
+            // 신호 강도에 따라 거리를 계산
+            // 신호 강도가 높을수록 더 가까이 배치
+            val distanceRatio = when (person.signalLevel) {
+                3 -> 0.1  // 신호가 강함(3) - 가장 가까이 배치
+                2 -> 0.4  // 신호가 중간(2) - 중간 거리에 배치
+                else -> 0.8  // 신호가 약함(1) - 멀리 배치
             }
             
             val radius = minRadius + (maxRadius - minRadius) * distanceRatio
@@ -167,13 +164,20 @@ fun MainContent(
                     .size(50.dp), // 클릭 가능한 영역 확보 (크기 고정)
                 contentAlignment = Alignment.Center
             ) {
-                // 여기서 카테고리화된 거리값 그대로 전달
+                // LanternDot 함수 호출 시 distance 매개변수를 전달
+                // 신호 레벨에 따라 거리 값을 계산하여 전달
+                val displayDistance = when (person.signalLevel) {
+                    3 -> 10f  // 신호가 강함 - 가까운 거리로 표시
+                    2 -> 50f  // 신호가 중간 - 중간 거리로 표시
+                    else -> 150f  // 신호가 약함 - 먼 거리로 표시
+                }
+                
                 LanternDot(
                     modifier = Modifier,
                     signalStrength = person.signalStrength,
                     pulseScale = animationValues.dotPulseScale,
                     glowAlpha = animationValues.dotGlowAlpha,
-                    distance = person.distance
+                    distance = displayDistance  // 오류가 있던 부분 수정
                 )
             }
         }

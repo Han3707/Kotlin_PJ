@@ -1,7 +1,7 @@
 package com.ssafy.lanterns.data.repository
 
 import com.ssafy.lanterns.data.model.ChatRoom
-import com.ssafy.lanterns.data.model.user.User
+import com.ssafy.lanterns.data.model.User
 import kotlinx.coroutines.flow.Flow
 
 /**

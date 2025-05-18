@@ -12,7 +12,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.ssafy.lanterns.service.audio.wakeword.WakeWordService
+import com.ssafy.lanterns.service.WakeWordService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job

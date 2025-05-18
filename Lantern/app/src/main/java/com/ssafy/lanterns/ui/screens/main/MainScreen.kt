@@ -207,7 +207,7 @@ fun MainScreen(
     LaunchedEffect(uiState.navigateToProfile) {
         uiState.navigateToProfile?.let { userId ->
             // 프로필 화면으로 이동 (프로필 화면에서 채팅하기 버튼으로 채팅 화면 이동)
-            val person = uiState.nearbyPeople.find { it.userId == userId }
+            val person = uiState.nearbyPeople.find { it.userId.toString() == userId }
             if (person != null) {
                 val route = "profile/${userId}/${person.name}/${person.distance.toInt()}m"
                 navController.navigate(route)

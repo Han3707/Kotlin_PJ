@@ -11,7 +11,8 @@ data class NearbyPerson(
     val angle: Float,
     val signalStrength: Float,
     val avatarSeed: Int = bleId.hashCode(), // 아바타 시드를 bleId 기반으로 변경
-    val rssi: Int
+    val rssi: Int,
+    val signalLevel: Int = 1 // 신호 강도 레벨 (1: 약함, 2: 중간, 3: 강함)
 )
 
 /**

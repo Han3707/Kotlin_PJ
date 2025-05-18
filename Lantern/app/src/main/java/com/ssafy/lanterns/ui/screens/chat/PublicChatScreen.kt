@@ -8,16 +8,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,15 +36,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.ssafy.lanterns.utils.PermissionHelper
@@ -58,26 +50,16 @@ import com.ssafy.lanterns.ui.components.ChatMessageBubble
 import com.ssafy.lanterns.ui.components.ChatUser
 import com.ssafy.lanterns.ui.components.NearbyUsersModal
 import com.ssafy.lanterns.ui.theme.*
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.consumeWindowInsets
 import com.ssafy.lanterns.service.ble.GlobalBleManager
 import com.ssafy.lanterns.ui.screens.main.MainViewModel
-import com.ssafy.lanterns.data.model.chat.ChatMessage
-import com.ssafy.lanterns.ui.screens.chat.state.PublicChatUiState
-import java.text.SimpleDateFormat
-import java.util.Date
 import kotlin.collections.isNotEmpty
-import kotlin.collections.reversed
 import androidx.compose.runtime.collectAsState
+import com.ssafy.lanterns.data.model.chat.ChatMessage
+import androidx.compose.foundation.lazy.items
 
 /**
  * BLE를 이용한 공용 채팅 구현 주석
@@ -355,7 +337,10 @@ fun PublicChatScreen(
                     reverseLayout = true, // DirectChatScreen과 일관되게 설정
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(uiState.messages) { msg ->
+                    items(
+                        items = uiState.messages,
+                        key = { msg -> msg.id }
+                    ) { msg ->
                         ChatMessageBubble(
                             senderName = if (msg.isMe) "나" else msg.sender,
                             text = msg.text,

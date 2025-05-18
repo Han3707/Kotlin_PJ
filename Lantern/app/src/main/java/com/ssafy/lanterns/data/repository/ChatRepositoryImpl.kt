@@ -85,14 +85,12 @@ class ChatRepositoryImpl @Inject constructor(
             // ChatRoomUserJoinTable 같은 연결 테이블이나, participantId를 통해 구분합니다.
             // 여기서는 ChatRoom 엔티티가 participantId (상대방 ID) 만 가진다고 가정합니다.
             val newChatRoom = ChatRoom(
-                id = chatRoomId,
+                chatRoomId = chatRoomId,
                 participantId = targetUserId, // 상대방 ID 저장
+                participantNickname = "새 참가자", // 필수 파라미터 추가
+                participantProfileImageNumber = 1, // 필수 파라미터 추가
                 lastMessage = null, // 새 채팅방이므로 마지막 메시지 없음
-                createdAt = LocalDateTime.now(),
-                updatedAt = LocalDateTime.now(),
-                // unreadCount = 0, // 읽지 않은 메시지 수 (필요하다면 ChatRoom 엔티티에 추가)
-                // participantNickname = "상대방닉네임", // 필요하다면 UserRepository에서 조회하여 설정
-                // participantProfileImage = "상대방프로필", // 필요하다면 UserRepository에서 조회하여 설정
+                updatedAt = LocalDateTime.now()
             )
             chatRoomDao.insertChatRoom(newChatRoom) // ChatRoomDao에 insertChatRoom(ChatRoom)이 있다고 가정
             chatRoom = newChatRoom // 새로 생성된 채팅방 반환

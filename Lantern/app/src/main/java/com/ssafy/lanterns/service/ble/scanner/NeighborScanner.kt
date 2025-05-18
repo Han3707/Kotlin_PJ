@@ -14,6 +14,7 @@ import android.os.Looper
 import android.util.Log
 import com.ssafy.lanterns.config.BleConstants
 import com.ssafy.lanterns.config.NeighborDiscoveryConstants
+import kotlinx.coroutines.sync.Mutex
 
 object NeighborScanner {
     private const val TAG = "NeighborScanner"
@@ -31,11 +32,11 @@ object NeighborScanner {
     private var myNickname: String = ""
 
     private val handler = Handler(Looper.getMainLooper())
-    private const val SCAN_TIMEOUT = 30000L // 30초 (오래된 데이터 기준)
-    private const val CLEANUP_INTERVAL = 3000L // 3초마다 정리
-    private const val SCAN_RESTART_INTERVAL = 8000L // 8초마다 재시작 (30초에서 8초로 변경)
-    private const val PROCESSING_INTERVAL = 500L // 동일 기기 재처리 간격 (ms)
-    private const val SCAN_WINDOW = 4000L // 스캔 윈도우 (2초에서 4초로 변경 - 더 긴 스캔)
+    private const val SCAN_TIMEOUT = 60000L // 60초로 증가 (30초→60초, 더 오래 기기 유지)
+    private const val CLEANUP_INTERVAL = 20000L // 20초로 증가 (상수값 수정)
+    private const val SCAN_RESTART_INTERVAL = 6000L // 6초로 조정 (8초→6초, 더 자주 스캔)
+    private const val PROCESSING_INTERVAL = 300L // 300ms로 감소 (500ms→300ms, 더 자주 처리)
+    private const val SCAN_WINDOW = 5000L // 5초로 증가 (4초→5초, 더 오래 스캔)
 
     // BLE 광고 패킷 최대 길이 및 관련 상수
     // private const val MAX_NICKNAME_LENGTH = 6 // NeighborDiscoveryConstants로 이동
@@ -46,7 +47,7 @@ object NeighborScanner {
     // private const val MANUFACTURER_ID_LOCATION = 0xFFFE // BleConstants로 이동
     
     // 로그 출력 제어용 상수
-    private const val DEBUG = false // 필요시 true로 변경하여 디버그 로그 활성화
+    private const val DEBUG = true // 개발 중 true, 배포 시 false
 
     private val restartHandler = Handler(Looper.getMainLooper())
     private var isCleanupRunning = false
@@ -55,6 +56,9 @@ object NeighborScanner {
     // RSSI 값 이력을 저장하는 맵 추가
     private val rssiHistory = mutableMapOf<String, MutableList<Int>>()
     private const val MAX_RSSI_HISTORY = 5 // 저장할 최대 RSSI 값 개수
+
+    // 공유 데이터 접근을 위한 뮤텍스
+    private val userMapMutex = Mutex()
 
     /**
      * 주변 사용자 데이터 클래스
@@ -119,23 +123,35 @@ object NeighborScanner {
         stopScanning()
         if (DEBUG) Log.d(TAG, "이전 스캔 중지 완료, 새 스캔 준비")
 
-        // 스캔 설정 변경 - 안정성 개선을 위해 ScanMode를 BALANCED로 설정
-        val scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_BALANCED) // 배터리 효율성과 스캔 성능 균형
-            .setReportDelay(0) // 즉시 결과 보고
-            .build()
-
         // 필터 설정 - 우리 앱에서 사용하는 제조사 ID만 필터링
-        val scanFilter = ScanFilter.Builder()
+        val userInfoFilter = ScanFilter.Builder()
             .setManufacturerData(
                 BleConstants.MANUFACTURER_ID_USER,
                 null,
                 null
             )
             .build()
-        
-        val scanFilters = listOf(scanFilter)
-        if (DEBUG) Log.d(TAG, "스캔 필터 설정 완료: 제조사 ID ${BleConstants.MANUFACTURER_ID_USER}(0x${Integer.toHexString(BleConstants.MANUFACTURER_ID_USER)})로 필터링")
+            
+        val locationFilter = ScanFilter.Builder()
+            .setManufacturerData(
+                BleConstants.MANUFACTURER_ID_LOCATION,
+                null,
+                null
+            )
+            .build()
+            
+        // 모든 필터를 포함한 목록 생성 (여러 필터 중 하나라도 매칭되면 결과 수신)
+        val scanFilters = listOf(userInfoFilter, locationFilter)
+        if (DEBUG) Log.d(TAG, "스캔 필터 설정 완료: 제조사 ID ${BleConstants.MANUFACTURER_ID_USER}와 ${BleConstants.MANUFACTURER_ID_LOCATION} 필터링")
+
+        // 스캔 설정 변경 - 안정성 개선을 위해 ScanMode를 LOW_LATENCY로 설정
+        val scanSettings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) // BALANCED → LOW_LATENCY로 변경하여 연결성 향상
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES) // 모든 일치 항목에 대해 콜백 호출
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE) // 적극적인 매칭 모드 (더 많은 기기 발견)
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT) // 최대한 많은 광고 매칭
+            .setReportDelay(0) // 지연 없이 즉시 결과 보고
+            .build()
 
         // 스캔 콜백 구현
         scanCallback = object : ScanCallback() {
@@ -168,6 +184,8 @@ object NeighborScanner {
                                     Log.d(TAG, "스캔 실패 후 재시도")
                                 } catch (se: SecurityException) {
                                     Log.e(TAG, "스캔 재시도 중 권한 오류: ${se.message}")
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "스캔 재시도 실패: ${e.message}")
                                 }
                             } catch (e: Exception) {
                                 Log.e(TAG, "스캔 재시도 실패: ${e.message}")
@@ -308,6 +326,11 @@ object NeighborScanner {
                           ((latLng[6].toInt() and 0xFF) shl 8) or
                           (latLng[7].toInt() and 0xFF)
                     if (DEBUG) Log.d(TAG, "바이너리 위치 데이터 파싱 성공: $lat, $lng")
+                    
+                    // 실제 위치 값 계산 및 로깅 (디버깅용)
+                    val actualLat = lat / NeighborDiscoveryConstants.LOCATION_PRECISION
+                    val actualLng = lng / NeighborDiscoveryConstants.LOCATION_PRECISION
+                    Log.d(TAG, "사용자 ${nickname} 실제 위치: $actualLat, $actualLng (원시값: $lat, $lng)")
                 } catch (e: Exception) {
                     Log.e(TAG, "바이너리 위치 데이터 파싱 오류: ${e.message}")
                 }
@@ -432,43 +455,77 @@ object NeighborScanner {
         isCleanupRunning = true
         handler.removeCallbacksAndMessages(null) // 기존 타이머 제거
         
-        handler.postDelayed(object : Runnable {
+        val cleanupRunnable: Runnable = object : Runnable {
             override fun run() {
-                cleanupOldUsers()
-                if (isCleanupRunning) {
-                    handler.postDelayed(this, CLEANUP_INTERVAL)
+                try {
+                    removeOldUsers()
+                    if (DEBUG) Log.d(TAG, "주기적 사용자 정보 정리 완료")
+                    
+                    // 주기적으로 다음 정리 작업 예약 (20초마다)
+                    if (isCleanupRunning) {
+                        handler.postDelayed(this, CLEANUP_INTERVAL)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "사용자 정보 정리 중 오류: ${e.message}")
                 }
             }
-        }, CLEANUP_INTERVAL)
+        }
+        
+        // 최초 실행 지연 없이 바로 시작 후 주기적 실행
+        handler.post(cleanupRunnable)
+        
+        if (DEBUG) Log.d(TAG, "사용자 정보 정리 타이머 시작됨 (${CLEANUP_INTERVAL}ms 간격)")
+    }
+    
+    /**
+     * 오래된 사용자 정보 제거
+     * - 지정된 시간 이상 스캔되지 않은 사용자 제거
+     */
+    private fun removeOldUsers() {
+        val currentTime = System.currentTimeMillis()
+        val toRemove = mutableListOf<String>() // 제거할 사용자 ID 목록
+
+        // 사용자 맵에서 오래된 항목 찾기
+        userMap.forEach { (bleId, user) ->
+            // 마지막 감지 후 30초가 지난 사용자 제거
+            if (currentTime - user.lastSeen > 30000) {
+                toRemove.add(bleId)
+                if (DEBUG) Log.d(TAG, "오래된 사용자 제거 대상: ${user.nickname} (${bleId}), 마지막 감지 후 ${(currentTime - user.lastSeen) / 1000}초 경과")
+            }
+        }
+
+        // 오래된 사용자 제거
+        toRemove.forEach { bleId ->
+            userMap.remove(bleId)
+            rssiHistory.remove(bleId)
+            lastProcessedTime.remove(bleId)
+            if (DEBUG) Log.d(TAG, "사용자 제거 완료: ${bleId}")
+        }
+
+        // 제거된 사용자 수 로깅
+        if (toRemove.isNotEmpty()) {
+            Log.i(TAG, "${toRemove.size}명의 오래된 사용자 정보 제거됨")
+        }
     }
 
     /**
-     * 오래된 사용자 정리
-     * - SCAN_TIMEOUT 이상 수신되지 않은 사용자 정보 삭제
+     * 현재 발견된 모든 사용자 정보 로깅
+     * - 디버깅용 함수로, 발견된 모든 사용자의 정보를 로그로 출력
      */
-    private fun cleanupOldUsers() {
-        if (userMap.isEmpty()) return
-        
-        val currentTime = System.currentTimeMillis()
-        val deleteCandidates = mutableListOf<String>() // 키 타입이 String (bleId)
-        
-        // 오래된 사용자 식별 (userMap의 키는 bleId)
-        userMap.forEach { (id, user) -> // key를 id로 받음 (bleId임)
-            val timeSinceLastSeen = currentTime - user.lastSeen
-            
-            if (DEBUG) Log.d(TAG, "사용자 ${user.nickname}(${id}): 마지막 발견 ${timeSinceLastSeen}ms 전, RSSI: ${user.rssi}")
-            
-            if (timeSinceLastSeen > SCAN_TIMEOUT) {
-                deleteCandidates.add(id)
-            }
+    fun logAllUsers() {
+        if (userMap.isEmpty()) {
+            Log.d(TAG, "발견된 사용자 없음")
+            return
         }
         
-        // 식별된 사용자 삭제
-        deleteCandidates.forEach { id ->
-            userMap.remove(id)
-            rssiHistory.remove(id)
-            lastProcessedTime.remove(id)
-            Log.i(TAG, "오래된 사용자 정보 제거: ${id}")
+        Log.d(TAG, "=== 현재 발견된 사용자 목록 (${userMap.size}명) ===")
+        userMap.forEach { (bleId, user) ->
+            val latActual = user.lat / 1000.0
+            val lngActual = user.lng / 1000.0
+            Log.d(TAG, "사용자: ${user.nickname} (${bleId})")
+            Log.d(TAG, "  - 위치: 원시값(${user.lat}, ${user.lng}) → 실제값($latActual, $lngActual)")
+            Log.d(TAG, "  - RSSI: ${user.rssi}, 마지막 발견: ${System.currentTimeMillis() - user.lastSeen}ms 전")
         }
+        Log.d(TAG, "===================================================")
     }
 }

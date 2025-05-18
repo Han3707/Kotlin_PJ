@@ -31,10 +31,14 @@ fun PersonDot(
     signalStrength: Float, 
     pulseScale: Float,
     glowAlpha: Float,
-    distance: Float = (1f - signalStrength) * 10f // 신호 강도에 따른 가상 거리 계산
+    signalLevel: Int = 1 // 신호 강도 레벨 (1-3)
 ) {
-    // 신호 강도에 따라 색상 결정
-    val dotColor = getConnectionColorByDistance(distance)
+    // 신호 강도 레벨에 따른 색상 결정
+    val dotColor = when (signalLevel) {
+        3 -> ConnectionNear     // 강한 신호
+        2 -> ConnectionMedium   // 중간 신호
+        else -> ConnectionFar   // 약한 신호
+    }
     
     // 더 큰 크기로 설정 (기존 8dp → 12dp)
     val baseSize = 12.dp

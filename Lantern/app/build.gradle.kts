@@ -41,11 +41,12 @@ android {
             keyAlias = "e204debugkey"
             keyPassword = "team204"
         }
+    
     }
 
     buildTypes {
         getByName("debug") {
-            signingConfig = signingConfigs.getByName("debug")
+            // signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
         }
         getByName("release") {

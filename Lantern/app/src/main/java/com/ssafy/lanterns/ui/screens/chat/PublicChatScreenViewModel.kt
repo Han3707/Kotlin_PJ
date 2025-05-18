@@ -19,7 +19,7 @@ class PublicChatScreenViewModel @Inject constructor() : ViewModel() {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
-    private val _uiState = MutableStateFlow(PublicChatUiState())
+    private val _uiState = MutableStateFlow<PublicChatUiState>(PublicChatUiState())
     val uiState: StateFlow<PublicChatUiState> = _uiState.asStateFlow()
     
     private val random = Random()
@@ -43,12 +43,12 @@ class PublicChatScreenViewModel @Inject constructor() : ViewModel() {
      */
     fun loadMoreMessages() {
         viewModelScope.launch {
-            _uiState.update { state ->
+            _uiState.update { state: PublicChatUiState ->
                 state.copy(isLoadingMore = true)
             }
             
             // 더 많은 메시지가 없음을 표시
-            _uiState.update { state ->
+            _uiState.update { state: PublicChatUiState ->
                 state.copy(
                     isLoadingMore = false,
                     hasMoreMessages = false
@@ -73,7 +73,7 @@ class PublicChatScreenViewModel @Inject constructor() : ViewModel() {
             )
             
             // UI 상태 업데이트
-            _uiState.update { state ->
+            _uiState.update { state: PublicChatUiState ->
                 state.copy(
                     messages = listOf(initialMessage),
                     isLoading = false,

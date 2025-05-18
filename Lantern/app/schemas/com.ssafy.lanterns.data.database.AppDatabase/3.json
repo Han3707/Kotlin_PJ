@@ -1,0 +1,331 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "c5ce4323043c59fea919dfca27a31399",
+    "entities": [
+      {
+        "tableName": "user",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER NOT NULL, `nickname` TEXT NOT NULL, `device_id` TEXT NOT NULL, `selected_profile_image_number` INTEGER NOT NULL DEFAULT 1, `status_message` TEXT, `email` TEXT, `lanterns` INTEGER NOT NULL DEFAULT 0, `profile_image` TEXT, `token` TEXT, `refresh_token` TEXT, `is_authenticated` INTEGER NOT NULL DEFAULT 0, `created_at` TEXT, PRIMARY KEY(`user_id`))",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "columnName": "user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nickname",
+            "columnName": "nickname",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "device_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedProfileImageNumber",
+            "columnName": "selected_profile_image_number",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "statusMessage",
+            "columnName": "status_message",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "lanterns",
+            "columnName": "lanterns",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "profileImage",
+            "columnName": "profile_image",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "token",
+            "columnName": "token",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "refreshToken",
+            "columnName": "refresh_token",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isAuthenticated",
+            "columnName": "is_authenticated",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "user_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "call_list",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`call_id` INTEGER NOT NULL, `user_id` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `date` TEXT NOT NULL, `incoming_outgoing` INTEGER NOT NULL, PRIMARY KEY(`call_id`))",
+        "fields": [
+          {
+            "fieldPath": "callId",
+            "columnName": "call_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "date",
+            "columnName": "date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "incomingOutgoing",
+            "columnName": "incoming_outgoing",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "call_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`messageId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL DEFAULT 0, `chatRoomId` TEXT NOT NULL DEFAULT '', `senderId` INTEGER NOT NULL DEFAULT 0, `receiverId` INTEGER NOT NULL DEFAULT 0, `content` TEXT NOT NULL DEFAULT '', `timestamp` INTEGER NOT NULL, `isSentByMe` INTEGER NOT NULL DEFAULT 0, `status` TEXT NOT NULL DEFAULT '0', `messageType` TEXT NOT NULL DEFAULT 'TEXT', FOREIGN KEY(`chatRoomId`) REFERENCES `chat_rooms`(`chatRoomId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "chatRoomId",
+            "columnName": "chatRoomId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "senderId",
+            "columnName": "senderId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "receiverId",
+            "columnName": "receiverId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "content",
+            "columnName": "content",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSentByMe",
+            "columnName": "isSentByMe",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'0'"
+          },
+          {
+            "fieldPath": "messageType",
+            "columnName": "messageType",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'TEXT'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "messageId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_messages_chatRoomId",
+            "unique": false,
+            "columnNames": [
+              "chatRoomId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_messages_chatRoomId` ON `${TABLE_NAME}` (`chatRoomId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "chat_rooms",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "chatRoomId"
+            ],
+            "referencedColumns": [
+              "chatRoomId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "follow",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`follow_id` INTEGER NOT NULL, `user_id` INTEGER NOT NULL, `follow_nickname` TEXT NOT NULL, PRIMARY KEY(`follow_id`))",
+        "fields": [
+          {
+            "fieldPath": "followId",
+            "columnName": "follow_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "userId",
+            "columnName": "user_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "followNickname",
+            "columnName": "follow_nickname",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "follow_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "chat_rooms",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`chatRoomId` TEXT NOT NULL DEFAULT '', `participantId` INTEGER NOT NULL DEFAULT 0, `participantNickname` TEXT NOT NULL DEFAULT '', `participantProfileImageNumber` INTEGER NOT NULL DEFAULT 1, `lastMessage` TEXT, `updatedAt` TEXT NOT NULL, PRIMARY KEY(`chatRoomId`))",
+        "fields": [
+          {
+            "fieldPath": "chatRoomId",
+            "columnName": "chatRoomId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "participantId",
+            "columnName": "participantId",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "participantNickname",
+            "columnName": "participantNickname",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "participantProfileImageNumber",
+            "columnName": "participantProfileImageNumber",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "lastMessage",
+            "columnName": "lastMessage",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "chatRoomId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c5ce4323043c59fea919dfca27a31399')"
+    ]
+  }
+}

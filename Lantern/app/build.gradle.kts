@@ -1,11 +1,8 @@
-import org.gradle.kotlin.dsl.implementation
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
     id("com.google.dagger.hilt.android")
-    id("com.google.gms.google-services")
 }
 
 ksp {
@@ -14,10 +11,11 @@ ksp {
 }
 
 android {
-    namespace = "com.ssafy.lantern"
+    namespace = "com.ssafy.lanterns"
     compileSdk = 35
+
     defaultConfig {
-        applicationId = "com.ssafy.lantern"
+        applicationId = "com.ssafy.lanterns"
         minSdk = 31
         targetSdk = 34
         versionCode = 1
@@ -35,29 +33,52 @@ android {
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // app/keystores/shared-debug.jks
+            storeFile = file("keystores/shared-debug.jks")
+            storePassword = "team204"
+            keyAlias = "e204debugkey"
+            keyPassword = "team204"
+        }
+    }
+
     buildTypes {
-        release {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+        }
+        getByName("release") {
+            // 릴리스 빌드 기본 설정만 유지
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            isDebuggable = false
         }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xjvm-default=all")
+        freeCompilerArgs += listOf(
+            "-Xjvm-default=all",
+            "-opt-in=androidx.media3.common.util.UnstableApi",
+            "-Xskip-metadata-version-check"
+        )
+        apiVersion = "1.9"
+        languageVersion = "1.9"
     }
 
     buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
+        dataBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -70,6 +91,31 @@ android {
             kotlin.srcDir("build/generated/ksp/$variantName/kotlin")
         }
     }
+    
+    // DataBinding과 KSP 문제 해결을 위한 설정 추가
+    androidComponents {
+        onVariants(selector().all()) { variant ->
+            afterEvaluate {
+                try {
+                    val variantName = variant.name.capitalize()
+                    val kspTask = tasks.getByName("ksp${variantName}Kotlin")
+                    val dataBindingTask = tasks.getByName("dataBindingGenBaseClasses${variantName}")
+                    
+                    kspTask.dependsOn(dataBindingTask)
+                    
+                    if (kspTask is org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompileTool<*>) {
+                        kspTask.source(dataBindingTask.outputs.files)
+                    }
+                } catch (e: Exception) {
+                    println("Warning: Could not configure DataBinding-KSP integration: ${e.message}")
+                }
+            }
+        }
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -82,29 +128,15 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
+    // Kotlin 표준 라이브러리 버전 강제 지정
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.22"))
+
     // Room
-    val roomVersion = "2.6.0"
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     testImplementation(libs.androidx.room.testing)
     implementation(libs.androidx.room.paging)
-
-    // 자바 8 기능을 위한 desugaring 라이브러리
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-
-    // Nordic BLE Mesh 라이브러리 추가 (버전 업데이트)
-    implementation("no.nordicsemi.android:mesh:3.3.4")
-    implementation("no.nordicsemi.android.support.v18:scanner:1.6.0")
-    implementation("no.nordicsemi.android:ble:2.10.0")
-
-
-
-    // 블루투스 리소스 추가
-    implementation("androidx.core:core-ktx:1.12.0")
-
-    // Gson for JSON serialization/deserialization
-    implementation("com.google.code.gson:gson:2.10.1")
 
     // Retrofit & OkHttp for network calls
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -115,29 +147,52 @@ dependencies {
     // DataStore for token storage
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-    // Jetpack Compose
+    // Jetpack Compose UI Components
     implementation(libs.androidx.ui.v180)
-    implementation(libs.androidx.material)
     implementation(libs.androidx.ui.tooling.preview.v180)
     implementation(libs.androidx.activity.compose.v170)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    
+    // Compose Material 관련 의존성
     implementation(libs.androidx.compose.material.icons)
+    implementation("androidx.compose.material:material:1.6.5")
+    implementation("androidx.compose.material3:material3:1.2.1")
+    implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
+    
+    // Compose Animation
+    implementation("androidx.compose.animation:animation:1.6.5")
+    implementation("androidx.compose.animation:animation-core:1.6.5")
+    implementation("androidx.compose.material:material-icons-extended:1.6.5")
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-common:1.3.1")
+
+    // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    
+    // Lifecycle Runtime Compose - LocalLifecycleOwner 지원
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    
+    // 앱 생명주기 감지를 위한 Process Lifecycle Owner
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
 
-    // Google Sign-In - 최신 버전으로 통일하고 중복 제거
-    implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경
-    implementation("com.google.firebase:firebase-auth:22.3.0") // 호환되는 Firebase 버전
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Hilt (버전은 프로젝트 상황에 맞게 조정)
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+
+    // Hilt
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-compiler:2.51.1")
-    // ViewModel 주입 (@HiltViewModel)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
-    // Accompanist Permissions (권한 요청 UI)
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0") // 최신 버전 확인
+    // Accompanist Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
+    // GPS
+    implementation("com.google.android.gms:play-services-location:21.0.1")
     
-    // Accompanist Insets (시스템 UI 인셋 처리)
-    implementation("com.google.accompanist:accompanist-insets:0.30.1")
-    implementation("com.google.accompanist:accompanist-systemuicontroller:0.30.1")
+    // Porcupine
+    implementation("ai.picovoice:porcupine-android:3.0.1")
 }

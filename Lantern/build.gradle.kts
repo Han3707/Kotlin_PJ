@@ -7,6 +7,7 @@ plugins {
 }
 
 buildscript {
+    val kotlinVersion = "1.9.22"
     repositories {
         google()
         mavenCentral()
@@ -14,7 +15,7 @@ buildscript {
     dependencies {
         classpath(libs.gradle)
         classpath(libs.kotlin.gradle.plugin)
-        classpath("com.google.gms:google-services:4.4.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
     }
 }
 
@@ -23,6 +24,10 @@ allprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
             jvmTarget = "17"
+            apiVersion = "1.9"
+            languageVersion = "1.9"
+            // 메타데이터 버전 체크 건너뛰기 (Kotlin 2.1.0과 1.9.0 호환성 문제 해결)
+            freeCompilerArgs += listOf("-Xskip-metadata-version-check")
         }
     }
 }

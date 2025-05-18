@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Bluetooth 기본 권한 설정-->
+    <!-- Bluetooth 기본 권한 설정 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <!-- 검색 권한 -->
@@ -15,6 +15,22 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- 인터넷 권한 추가 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 네트워크 상태 확인 권한 -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 음성 인식 권한 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- PicoVoice 권한 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- 좌표 값 받아오기-->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
 
     <application
@@ -27,18 +43,55 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Lantern"
+        android:theme="@style/Theme.Lanterns"
+        android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="31">
+
+
+        <service
+            android:name=".service.WakeWordService" android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone"
+            tools:ignore="ForegroundServicePermission" />
         <activity
-            android:name=".ui.view.main.MainActivity"
+        android:name=".ui.view.main.MainActivity" android:exported="true"
+        android:windowSoftInputMode="adjustResize">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent-filter>
+    </activity>
+
+
+
+        <!-- OAuth 콜백을 받을 액티비티 -->
+        <activity
+            android:name=".ui.view.auth.AuthCallbackActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <!-- redirect_uri 에 매핑되는 스킴/호스트 -->
+                <data
+                    android:scheme="com.ssafy.lanterns"
+                    android:host="oauth2callback"/>
             </intent-filter>
         </activity>
+
+
+
+        <!-- 메인 런처 액티비티 -->
+<!--        <activity-->
+<!--            android:name=".ui.view.main.MainActivity"-->
+<!--            android:exported="true">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.intent.action.MAIN"/>-->
+<!--                <category android:name="android.intent.category.LAUNCHER"/>-->
+<!--            </intent-filter>-->
+<!--        </activity>-->
+
     </application>
 
 </manifest>

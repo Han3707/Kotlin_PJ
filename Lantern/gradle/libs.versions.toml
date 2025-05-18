@@ -10,6 +10,7 @@ espressoCore              = "3.6.1"
 appcompat                 = "1.7.0"
 kotlinGradlePlugin = "1.8.21"
 material                  = "1.12.0"
+material3                 = "1.2.1"
 activity                  = "1.8.0"
 constraintlayout          = "2.2.1"
 roomRuntime               = "2.6.0"
@@ -28,6 +29,8 @@ androidx-appcompat       = { group="androidx.appcompat",     name="appcompat",  
 androidx-constraintlayout= { group="androidx.constraintlayout", name="constraintlayout",    version.ref="constraintlayout" }
 androidx-activity        = { group="androidx.activity",     name="activity",              version.ref="activity" }
 androidx-material = { module = "androidx.compose.material:material", version.ref = "composeUi" }
+androidx-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+androidx-material3-window-size = { module = "androidx.compose.material3:material3-window-size-class", version.ref = "material3" }
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "roomRuntime" }
 androidx-ui-tooling-preview-v180 = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "uiToolingPreview" }
 androidx-ui-v180 = { module = "androidx.compose.ui:ui", version.ref = "ui" }
